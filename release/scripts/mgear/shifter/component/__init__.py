@@ -1035,7 +1035,7 @@ class Main(object):
 
     def getHost(self):
         """Get the host for the properties"""
-        self.uihost = self.rig.findRelative(self.settings["ui_host"])
+        self.uihost = self.rig.findControlRelative(self.settings["ui_host"])
 
     def set_ui_host_components_controls(self):
         """Set a list of all controls that are common to the ui host

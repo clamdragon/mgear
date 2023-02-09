@@ -24,6 +24,8 @@ class Component(component.Main):
         self.WIP = self.options["mode"]
         self.up_axis = pm.upAxis(q=True, axis=True)
 
+        self.blade_normal = self.guide.blades["blade"].z
+
         self.normal = self.getNormalFromPos(self.guide.apos)
 
         self.length0 = vector.getDistance(
@@ -148,13 +150,23 @@ class Component(component.Main):
             self.fk1_ctl, ["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx"]
         )
 
-        t = transform.getTransformLookingAt(
-            self.guide.apos[2],
-            self.guide.apos[3],
-            self.normal,
-            "xz",
-            self.negate,
-        )
+        if self.settings["use_blade"]:
+            t = transform.getTransformLookingAt(
+                self.guide.apos[2],
+                self.guide.apos[3],
+                self.blade_normal,
+                "xz",
+                self.negate,
+            )
+        else:
+            t = transform.getTransformLookingAt(
+                self.guide.apos[2],
+                self.guide.apos[3],
+                self.normal,
+                "xz",
+                self.negate,
+            )
+
         if self.settings["FK_rest_T_Pose"]:
             t_npo = transform.setMatrixPosition(
                 transform.getTransform(self.fk0_ctl), self.guide.apos[2]
@@ -344,15 +356,6 @@ class Component(component.Main):
             attribute.setInvertMirror(self.mid_ctl, ["tx", "ty", "tz"])
 
         # Twist references ---------------------------------
-        x = datatypes.Vector(0, -1, 0)
-        x = x * transform.getTransform(self.eff_loc)
-        z = datatypes.Vector(self.normal.x, self.normal.y, self.normal.z)
-        z = z * transform.getTransform(self.eff_loc)
-
-        m = transform.getRotationFromAxis(x, z, "xz", self.negate)
-        m = transform.setMatrixPosition(
-            m, transform.getTranslation(self.ik_ctl)
-        )
 
         self.rollRef = primitive.add2DChain(
             self.root,
@@ -492,6 +495,19 @@ class Component(component.Main):
                 twist_idx += increment
 
         # End reference ------------------------------------
+        x = datatypes.Vector(0, -1, 0)
+        x = x * transform.getTransform(self.eff_loc)
+        if self.settings["use_blade"]:
+            z = self.blade_normal
+        else:
+            z = self.normal
+        z = z * transform.getTransform(self.eff_loc)
+
+        m = transform.getRotationFromAxis(x, z, "xz", self.negate)
+        m = transform.setMatrixPosition(
+            m, transform.getTranslation(self.ik_ctl)
+        )
+
         # To help the deformation on the ankle
         self.end_ref = primitive.addTransform(
             self.tws2_rot, self.getName("end_ref"), m

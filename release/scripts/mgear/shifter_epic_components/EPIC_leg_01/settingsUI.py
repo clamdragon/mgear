@@ -1,6 +1,14 @@
-from mgear.core import pyqt
-QtGui, QtCore, QtWidgets, wrapInstance = pyqt.qt_import()
+# -*- coding: utf-8 -*-
 
+# Form implementation generated from reading ui file 'C:/Users/Brendan/OneDrive/3D/ROBOT/ArtTools/mainline/Maya/modules/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_leg_01/settingsUI.ui',
+# licensing of 'C:/Users/Brendan/OneDrive/3D/ROBOT/ArtTools/mainline/Maya/modules/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_leg_01/settingsUI.ui' applies.
+#
+# Created: Thu Jan 19 16:18:32 2023
+#      by: pyside2-uic  running on PySide2 5.12.5
+#
+# WARNING! All changes made in this file will be lost!
+
+from PySide2 import QtCore, QtGui, QtWidgets
 
 class Ui_Form(object):
     def setupUi(self, Form):
@@ -78,6 +86,9 @@ class Ui_Form(object):
         self.TPoseRest_checkBox = QtWidgets.QCheckBox(self.groupBox)
         self.TPoseRest_checkBox.setObjectName("TPoseRest_checkBox")
         self.verticalLayout.addWidget(self.TPoseRest_checkBox)
+        self.useBlade_checkBox = QtWidgets.QCheckBox(self.groupBox)
+        self.useBlade_checkBox.setObjectName("useBlade_checkBox")
+        self.verticalLayout.addWidget(self.useBlade_checkBox)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.squashStretchProfile_pushButton = QtWidgets.QPushButton(self.groupBox)
@@ -195,33 +206,34 @@ class Ui_Form(object):
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(pyqt.fakeTranslate("Form", "Form", None, -1))
-        self.ikfk_label.setText(pyqt.fakeTranslate("Form", "IK/FK Blend", None, -1))
-        self.maxStretch_label.setText(pyqt.fakeTranslate("Form", "Max Stretch", None, -1))
-        self.divisions_label.setText(pyqt.fakeTranslate("Form", "Divisions", None, -1))
-        self.mirrorMid_checkBox.setToolTip(pyqt.fakeTranslate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
-        self.mirrorMid_checkBox.setStatusTip(pyqt.fakeTranslate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
-        self.mirrorMid_checkBox.setWhatsThis(pyqt.fakeTranslate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
-        self.mirrorMid_checkBox.setText(pyqt.fakeTranslate("Form", "Mirror Mid Ctl and UPV  axis", None, -1))
-        self.extraTweak_checkBox.setToolTip(pyqt.fakeTranslate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
-        self.extraTweak_checkBox.setStatusTip(pyqt.fakeTranslate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
-        self.extraTweak_checkBox.setWhatsThis(pyqt.fakeTranslate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
-        self.extraTweak_checkBox.setText(pyqt.fakeTranslate("Form", "Add Extra Tweak Ctl", None, -1))
-        self.TPoseRest_checkBox.setToolTip(pyqt.fakeTranslate("Form", "<html><head/><body><p>If checked, the Rest pose for  FK controls will be in T Pose</p></body></html>", None, -1))
-        self.TPoseRest_checkBox.setStatusTip(pyqt.fakeTranslate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
-        self.TPoseRest_checkBox.setWhatsThis(pyqt.fakeTranslate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
-        self.TPoseRest_checkBox.setText(pyqt.fakeTranslate("Form", "FK Rest T Pose", None, -1))
-        self.squashStretchProfile_pushButton.setText(pyqt.fakeTranslate("Form", "Squash and Stretch Profile", None, -1))
-        self.ikRefArray_groupBox.setTitle(pyqt.fakeTranslate("Form", "IK Reference Array", None, -1))
-        self.ikRefArray_copyRef_pushButton.setText(pyqt.fakeTranslate("Form", "Copy from UpV Ref", None, -1))
-        self.ikRefArrayAdd_pushButton.setText(pyqt.fakeTranslate("Form", "<<", None, -1))
-        self.ikRefArrayRemove_pushButton.setText(pyqt.fakeTranslate("Form", ">>", None, -1))
-        self.upvRefArray_groupBox.setTitle(pyqt.fakeTranslate("Form", "UpV Reference Array", None, -1))
-        self.upvRefArray_copyRef_pushButton.setText(pyqt.fakeTranslate("Form", "Copy from IK Ref", None, -1))
-        self.upvRefArrayAdd_pushButton.setText(pyqt.fakeTranslate("Form", "<<", None, -1))
-        self.upvRefArrayRemove_pushButton.setText(pyqt.fakeTranslate("Form", ">>", None, -1))
-        self.pinRefArray_groupBox.setTitle(pyqt.fakeTranslate("Form", "Pin Elbow Reference Array", None, -1))
-        self.pinRefArray_copyRef_pushButton.setText(pyqt.fakeTranslate("Form", "Copy from IK Ref", None, -1))
-        self.pinRefArrayAdd_pushButton.setText(pyqt.fakeTranslate("Form", "<<", None, -1))
-        self.pinRefArrayRemove_pushButton.setText(pyqt.fakeTranslate("Form", ">>", None, -1))
+        Form.setWindowTitle(QtWidgets.QApplication.translate("Form", "Form", None, -1))
+        self.ikfk_label.setText(QtWidgets.QApplication.translate("Form", "IK/FK Blend", None, -1))
+        self.maxStretch_label.setText(QtWidgets.QApplication.translate("Form", "Max Stretch", None, -1))
+        self.divisions_label.setText(QtWidgets.QApplication.translate("Form", "Divisions", None, -1))
+        self.mirrorMid_checkBox.setToolTip(QtWidgets.QApplication.translate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
+        self.mirrorMid_checkBox.setStatusTip(QtWidgets.QApplication.translate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
+        self.mirrorMid_checkBox.setWhatsThis(QtWidgets.QApplication.translate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
+        self.mirrorMid_checkBox.setText(QtWidgets.QApplication.translate("Form", "Mirror Mid Ctl and UPV  axis", None, -1))
+        self.extraTweak_checkBox.setToolTip(QtWidgets.QApplication.translate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
+        self.extraTweak_checkBox.setStatusTip(QtWidgets.QApplication.translate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
+        self.extraTweak_checkBox.setWhatsThis(QtWidgets.QApplication.translate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
+        self.extraTweak_checkBox.setText(QtWidgets.QApplication.translate("Form", "Add Extra Tweak Ctl", None, -1))
+        self.TPoseRest_checkBox.setToolTip(QtWidgets.QApplication.translate("Form", "<html><head/><body><p>If checked, the Rest pose for  FK controls will be in T Pose</p></body></html>", None, -1))
+        self.TPoseRest_checkBox.setStatusTip(QtWidgets.QApplication.translate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
+        self.TPoseRest_checkBox.setWhatsThis(QtWidgets.QApplication.translate("Form", "This option set the axis of the mid CTL (elbow) and the up vector control to move in a mirror behaviour ", None, -1))
+        self.TPoseRest_checkBox.setText(QtWidgets.QApplication.translate("Form", "FK Rest T Pose", None, -1))
+        self.useBlade_checkBox.setText(QtWidgets.QApplication.translate("Form", "Use Foot Blade", None, -1))
+        self.squashStretchProfile_pushButton.setText(QtWidgets.QApplication.translate("Form", "Squash and Stretch Profile", None, -1))
+        self.ikRefArray_groupBox.setTitle(QtWidgets.QApplication.translate("Form", "IK Reference Array", None, -1))
+        self.ikRefArray_copyRef_pushButton.setText(QtWidgets.QApplication.translate("Form", "Copy from UpV Ref", None, -1))
+        self.ikRefArrayAdd_pushButton.setText(QtWidgets.QApplication.translate("Form", "<<", None, -1))
+        self.ikRefArrayRemove_pushButton.setText(QtWidgets.QApplication.translate("Form", ">>", None, -1))
+        self.upvRefArray_groupBox.setTitle(QtWidgets.QApplication.translate("Form", "UpV Reference Array", None, -1))
+        self.upvRefArray_copyRef_pushButton.setText(QtWidgets.QApplication.translate("Form", "Copy from IK Ref", None, -1))
+        self.upvRefArrayAdd_pushButton.setText(QtWidgets.QApplication.translate("Form", "<<", None, -1))
+        self.upvRefArrayRemove_pushButton.setText(QtWidgets.QApplication.translate("Form", ">>", None, -1))
+        self.pinRefArray_groupBox.setTitle(QtWidgets.QApplication.translate("Form", "Pin Elbow Reference Array", None, -1))
+        self.pinRefArray_copyRef_pushButton.setText(QtWidgets.QApplication.translate("Form", "Copy from IK Ref", None, -1))
+        self.pinRefArrayAdd_pushButton.setText(QtWidgets.QApplication.translate("Form", "<<", None, -1))
+        self.pinRefArrayRemove_pushButton.setText(QtWidgets.QApplication.translate("Form", ">>", None, -1))
 

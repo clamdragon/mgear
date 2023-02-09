@@ -1,4 +1,5 @@
 from functools import partial
+import pymel.core as pm
 
 from mgear.shifter.component import guide
 from mgear.core import transform, pyqt
@@ -49,6 +50,7 @@ class Guide(guide.ComponentGuide):
     def postInit(self):
         """Initialize the position for the guide"""
         self.save_transform = ["root", "knee", "ankle", "eff"]
+        self.save_blade = ["blade"]
 
     def addObjects(self):
         """Add the Guide Root, blade and locators"""
@@ -64,6 +66,8 @@ class Guide(guide.ComponentGuide):
         centers = [self.root, self.knee, self.ankle, self.eff]
         self.dispcrv = self.addDispCurve("crv", centers)
 
+        self.blade = self.addBlade("blade", self.ankle, self.eff)
+
     def addParameters(self):
         """Add the configurations settings"""
 
@@ -76,6 +80,7 @@ class Guide(guide.ComponentGuide):
         self.pMirrorMid = self.addParam("mirrorMid", "bool", False)
         self.pExtraTweak = self.addParam("extraTweak", "bool", False)
         self.pTPoseRest = self.addParam("FK_rest_T_Pose", "bool", False)
+        self.pUseBlade = self.addParam("use_blade", "bool", False)
 
         # Divisions
         self.pDiv0 = self.addParam("div0", "long", 2, 0, None)
@@ -102,6 +107,12 @@ class Guide(guide.ComponentGuide):
         self.divisions = self.root.div0.get() + self.root.div1.get() + 3
 
         return self.divisions
+
+    def postDraw(self):
+        "Add post guide draw elements to the guide"
+        # hide blade if not in use
+        for shp in self.blade.getShapes():
+            pm.connectAttr(self.root.use_blade, shp.attr("visibility"))
 
 
 ##########################################################
@@ -173,6 +184,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.populateCheck(
             self.settingsTab.TPoseRest_checkBox, "FK_rest_T_Pose"
         )
+        self.populateCheck(self.settingsTab.useBlade_checkBox, "use_blade")
         self.settingsTab.div0_spinBox.setValue(self.root.attr("div0").get())
         self.settingsTab.div1_spinBox.setValue(self.root.attr("div1").get())
         ikRefArrayItems = self.root.attr("ikrefarray").get().split(",")
@@ -243,6 +255,14 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 self.updateCheck,
                 self.settingsTab.TPoseRest_checkBox,
                 "FK_rest_T_Pose",
+            )
+        )
+
+        self.settingsTab.useBlade_checkBox.stateChanged.connect(
+            partial(
+                self.updateCheck,
+                self.settingsTab.useBlade_checkBox,
+                "use_blade",
             )
         )
 
