@@ -47,6 +47,7 @@ class Component(component.Main):
         self.WIP = self.options["mode"]
 
         self.normal = self.getNormalFromPos(self.guide.apos)
+        self.up_axis = pm.upAxis(q=True, axis=True)
 
         self.length0 = vector.getDistance(
             self.guide.apos[0], self.guide.apos[1]
@@ -662,7 +663,7 @@ class Component(component.Main):
                     {
                         "obj": roll_off,
                         "name": jdn_thigh,
-                        "guide_relative": self.guide.guide_locators[0],
+                        "guide_relative": "root",
                         "data_contracts": "Ik",
                         "leaf_joint": self.settings["leafJoints"],
                     }
@@ -677,7 +678,7 @@ class Component(component.Main):
                         "obj": roll_off,
                         "name": jdn_calf,
                         "newActiveJnt": current_parent,
-                        "guide_relative": self.guide.guide_locators[1],
+                        "guide_relative": "knee",
                         "data_contracts": "Ik",
                         "leaf_joint": self.settings["leafJoints"],
                     }
@@ -732,12 +733,19 @@ class Component(component.Main):
         attribute.setKeyableAttributes(tweak_ctl)
         self.tweak_ctl.append(tweak_ctl)
 
+        # set offset orientation to mathc EPIC standard orientation
+        self.end_jnt_off = primitive.addTransform(
+            tweak_ctl, self.getName("end_off"), m
+        )
+        if self.up_axis == "z":
+            self.end_jnt_off.rz.set(-90)
+
         self.jnt_pos.append(
             {
-                "obj": self.end_ref,
+                "obj": self.end_jnt_off,
                 "name": jdn_foot,
                 "newActiveJnt": current_parent,
-                "guide_relative": self.guide.guide_locators[2],
+                "guide_relative": "ankle",
                 "data_contracts": "Ik",
                 "leaf_joint": self.settings["leafJoints"],
             }
@@ -927,59 +935,45 @@ class Component(component.Main):
             "legBaseRoll", "Leg Base Roll", "double", 0
         )
         self.scale_att = self.addAnimParam(
-            "ikscale", "Scale", "double", 100, 1, 999
+            "ikscale", "Scale", "double", 1, 0.001, 10
         )
-        self.scale_att = node.createDivNode(self.scale_att, 100).outputX
         self.maxstretch_att = self.addAnimParam(
             "maxstretch",
             "Max Stretch",
             "double",
-            self.settings["maxstretch"] * 100,
+            self.settings["maxstretch"],
+            1,
             100,
-            100000,
         )
-        self.maxstretch_att = node.createDivNode(
-            self.maxstretch_att, 100
-        ).outputX
 
         self.slide_att = self.addAnimParam(
-            "slide", "Slide", "double", 50, 0, 100
+            "slide", "Slide", "double", 0.5, 0, 1
         )
-        self.slide_att = node.createDivNode(self.slide_att, 100).outputX
 
         self.softness_att = self.addAnimParam(
-            "softness", "Softness", "double", 0, 0, 100
+            "softness", "Softness", "double", 0, 0, 1
         )
-        self.softness_att = node.createDivNode(self.softness_att, 100).outputX
 
         self.reverse_att = self.addAnimParam(
-            "reverse", "Reverse", "double", 0, 0, 100
+            "reverse", "Reverse", "double", 0, 0, 1
         )
-        self.reverse_att = node.createDivNode(self.reverse_att, 100).outputX
 
         self.roundness_att = self.addAnimParam(
-            "roundness", "Roundness", "double", 0, 0, 100
+            "roundness", "Roundness", "double", 0, 0, 1
         )
-        self.roundness_att = node.createDivNode(
-            self.roundness_att, 100
-        ).outputX
 
         self.volume_att = self.addAnimParam(
-            "volume", "Volume Joint Scale", "double", 0, 0, 100
+            "volume", "Volume Joint Scale", "double", 0, 0, 1
         )
-        self.volume_att = node.createDivNode(self.volume_att, 100).outputX
 
         self.volume_blenshape_mult_att = self.addAnimParam(
             "volume_blendshape",
             "Volume Blendshape Mult",
             "double",
-            100,
+            1,
             0,
-            1000,
+            10,
         )
-        self.volume_blenshape_mult_att = node.createDivNode(
-            self.volume_blenshape_mult_att, 100
-        ).outputX
 
         self.rootVis_att = self.addAnimParam(
             "root_ctl_vis", "Root Ctl vis", "bool", False
@@ -1020,49 +1014,32 @@ class Component(component.Main):
 
         # section scale
         self.uplegWide_att = self.addAnimParam(
-            "wide", "Wide", "double", 0, -90, uihost=self.uplegBendyA_ctl
+            "wide", "Wide", "double", 0, -0.9, uihost=self.uplegBendyA_ctl
         )
-        self.uplegWide_att = node.createDivNode(
-            self.uplegWide_att, 100
-        ).outputX
 
         self.midWide_att = self.addAnimParam(
-            "wide", "Wide", "double", 0, -90, uihost=self.mid_ctl
+            "wide", "Wide", "double", 0, -0.9, uihost=self.mid_ctl
         )
-        self.midWide_att = node.createDivNode(self.midWide_att, 100).outputX
 
         self.lowlegWide_att = self.addAnimParam(
-            "wide", "Wide", "double", 0, -90, uihost=self.lowlegBendyB_ctl
+            "wide", "Wide", "double", 0, -0.9, uihost=self.lowlegBendyB_ctl
         )
-        self.lowlegWide_att = node.createDivNode(
-            self.lowlegWide_att, 100
-        ).outputX
 
         self.uplegDepth_att = self.addAnimParam(
-            "depth", "Depth", "double", 0, -90, uihost=self.uplegBendyA_ctl
+            "depth", "Depth", "double", 0, -0.9, uihost=self.uplegBendyA_ctl
         )
-        self.uplegDepth_att = node.createDivNode(
-            self.uplegDepth_att, 100
-        ).outputX
 
         self.midDepth_att = self.addAnimParam(
-            "depth", "Depth", "double", 0, -90, uihost=self.mid_ctl
+            "depth", "Depth", "double", 0, -0.9, uihost=self.mid_ctl
         )
-        self.midDepth_att = node.createDivNode(self.midDepth_att, 100).outputX
 
         self.lowlegDepth_att = self.addAnimParam(
-            "depth", "Depth", "double", 0, -90, uihost=self.lowlegBendyB_ctl
+            "depth", "Depth", "double", 0, -0.9, uihost=self.lowlegBendyB_ctl
         )
-        self.lowlegDepth_att = node.createDivNode(
-            self.lowlegDepth_att, 100
-        ).outputX
 
         self.foot_squash_att = self.addAnimParam(
-            "footSquash", "Foot Squash", "double", 100, 10, 200
+            "footSquash", "Foot Squash", "double", 1, 0.1, 2
         )
-        self.foot_squash_att = node.createDivNode(
-            self.foot_squash_att, 100
-        ).outputX
 
         # gimbal vis attr
         self.gimbal_vis_attrs = []
@@ -1161,7 +1138,7 @@ class Component(component.Main):
             "absolute", "Absolute", "bool", False
         )
         self.volume_blenshape_att = self.addSetupParam(
-            "volume_blendshape", "Volume Blendshape", "double", 0, 0, 100
+            "volume_blendshape", "Volume Blendshape", "double", 0, 0, 10
         )
 
     # =====================================================
@@ -1410,6 +1387,10 @@ class Component(component.Main):
         self.ikhUpLegTwist.attr("dWorldUpVectorY").set(0.0)
         self.ikhUpLegTwist.attr("dWorldUpVectorEndZ").set(1.0)
         self.ikhUpLegTwist.attr("dWorldUpVectorEndY").set(0.0)
+
+        if self.negate:
+            self.ikhUpLegTwist.attr("dForwardAxis").set(1)
+
         pm.connectAttr(
             self.uplegRollRef[0].attr("worldMatrix[0]"),
             self.ikhUpLegTwist.attr("dWorldUpMatrix"),

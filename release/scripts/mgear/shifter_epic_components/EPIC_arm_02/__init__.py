@@ -47,6 +47,9 @@ class Component(component.Main):
 
         self.WIP = self.options["mode"]
 
+        self.blade_normal = self.guide.blades["blade"].z * -1
+        self.blade_binormal = self.guide.blades["blade"].x
+
         self.normal = self.getNormalFromPos(self.guide.apos)
         self.binormal = self.getBiNormalFromPos(self.guide.apos)
 
@@ -705,7 +708,7 @@ class Component(component.Main):
                     {
                         "obj": roll_off,
                         "name": jdn_upperarm,
-                        "guide_relative": self.guide.guide_locators[0],
+                        "guide_relative": "root",
                         "data_contracts": "Ik",
                         "leaf_joint": self.settings["leafJoints"],
                     }
@@ -720,7 +723,7 @@ class Component(component.Main):
                         "obj": roll_off,
                         "name": jdn_lowerarm,
                         "newActiveJnt": current_parent,
-                        "guide_relative": self.guide.guide_locators[1],
+                        "guide_relative": "elbow",
                         "data_contracts": "Ik",
                         "leaf_joint": self.settings["leafJoints"],
                     }
@@ -760,12 +763,27 @@ class Component(component.Main):
                 transform.getTransform(self.ikRot_ctl),
             )
 
+        if self.settings["use_blade"]:
+            # set the offset rotation for the hand
+            self.off_t = transform.getTransformLookingAt(
+                self.guide.pos["wrist"],
+                self.guide.pos["eff"],
+                self.blade_normal,
+                axis="xy",
+                negate=self.negate,
+            )
+            self.eff_jnt_off = primitive.addTransform(
+                self.end_ref, self.getName("eff_off"), self.off_t
+            )
+        else:
+            self.eff_jnt_off = self.end_ref
+
         self.jnt_pos.append(
             {
-                "obj": self.end_ref,
+                "obj": self.eff_jnt_off,
                 "name": jdn_hand,
                 "newActiveJnt": current_parent,
-                "guide_relative": self.guide.guide_locators[2],
+                "guide_relative": "wrist",
                 "data_contracts": "Ik",
                 "leaf_joint": self.settings["leafJoints"],
             }
@@ -922,60 +940,46 @@ class Component(component.Main):
             "armpitRoll", "Armpit Roll", "double", 0
         )
         self.scale_att = self.addAnimParam(
-            "ikscale", "Scale", "double", 100, 1, 10000
+            "ikscale", "Scale", "double", 1, 0.001, 10
         )
-        self.scale_att = node.createDivNode(self.scale_att, 100).outputX
 
         self.maxstretch_att = self.addAnimParam(
             "maxstretch",
             "Max Stretch",
             "double",
-            self.settings["maxstretch"] * 100,
+            self.settings["maxstretch"],
+            1,
             100,
-            100000,
         )
-        self.maxstretch_att = node.createDivNode(
-            self.maxstretch_att, 100
-        ).outputX
 
         self.slide_att = self.addAnimParam(
-            "slide", "Slide", "double", 50, 0, 100
+            "slide", "Slide", "double", 0.5, 0, 1
         )
-        self.slide_att = node.createDivNode(self.slide_att, 100).outputX
 
         self.softness_att = self.addAnimParam(
-            "softness", "Softness", "double", 0, 0, 100
+            "softness", "Softness", "double", 0, 0, 1
         )
-        self.softness_att = node.createDivNode(self.softness_att, 100).outputX
 
         self.reverse_att = self.addAnimParam(
-            "reverse", "Reverse", "double", 0, 0, 100
+            "reverse", "Reverse", "double", 0, 0, 1
         )
-        self.reverse_att = node.createDivNode(self.reverse_att, 100).outputX
 
         self.roundness_att = self.addAnimParam(
-            "roundness", "Roundness", "double", 0, 0, 100
+            "roundness", "Roundness", "double", 0, 0, 1
         )
-        self.roundness_att = node.createDivNode(
-            self.roundness_att, 100
-        ).outputX
 
         self.volume_att = self.addAnimParam(
-            "volume", "Volume Joint Scale", "double", 0, 0, 100
+            "volume", "Volume Joint Scale", "double", 0, 0, 1
         )
-        self.volume_att = node.createDivNode(self.volume_att, 100).outputX
 
         self.volume_blenshape_mult_att = self.addAnimParam(
             "volume_blendshape",
             "Volume Blendshape Mult",
             "double",
-            100,
+            1,
             0,
-            1000,
+            10,
         )
-        self.volume_blenshape_mult_att = node.createDivNode(
-            self.volume_blenshape_mult_att, 100
-        ).outputX
 
         self.bendyVis_att = self.addAnimParam(
             "Bendy_vis", "Bendy vis", "bool", False
@@ -1013,34 +1017,28 @@ class Component(component.Main):
         )
         # section scale
         self.armWide_att = self.addAnimParam(
-            "wide", "Wide", "double", 0, -90, uihost=self.armBendyA_ctl
+            "wide", "Wide", "double", 0, -0.9, uihost=self.armBendyA_ctl
         )
-        self.armWide_att = node.createDivNode(self.armWide_att, 100).outputX
 
         self.midWide_att = self.addAnimParam(
-            "wide", "Wide", "double", 0, -90, uihost=self.mid_ctl
+            "wide", "Wide", "double", 0, -0.9, uihost=self.mid_ctl
         )
-        self.midWide_att = node.createDivNode(self.midWide_att, 100).outputX
 
         self.foreWide_att = self.addAnimParam(
-            "wide", "Wide", "double", 0, -90, uihost=self.forearmBendyB_ctl
+            "wide", "Wide", "double", 0, -0.9, uihost=self.forearmBendyB_ctl
         )
-        self.foreWide_att = node.createDivNode(self.foreWide_att, 100).outputX
 
         self.armHigh_att = self.addAnimParam(
-            "high", "High", "double", 0, -90, uihost=self.armBendyA_ctl
+            "high", "High", "double", 0, -0.9, uihost=self.armBendyA_ctl
         )
-        self.armHigh_att = node.createDivNode(self.armHigh_att, 100).outputX
 
         self.midHigh_att = self.addAnimParam(
-            "high", "High", "double", 0, -90, uihost=self.mid_ctl
+            "high", "High", "double", 0, -0.9, uihost=self.mid_ctl
         )
-        self.midHigh_att = node.createDivNode(self.midHigh_att, 100).outputX
 
         self.foreHigh_att = self.addAnimParam(
-            "high", "High", "double", 0, -90, uihost=self.forearmBendyB_ctl
+            "high", "High", "double", 0, -0.9, uihost=self.forearmBendyB_ctl
         )
-        self.foreHigh_att = node.createDivNode(self.foreHigh_att, 100).outputX
 
         # gimbal vis attr
         self.gimbal_vis_attrs = []
@@ -1143,7 +1141,7 @@ class Component(component.Main):
             "absolute", "Absolute", "bool", False
         )
         self.volume_blenshape_att = self.addSetupParam(
-            "volume_blendshape", "Volume Blendshape", "double", 0, 0, 100
+            "volume_blendshape", "Volume Blendshape", "double", 0, 0, 10
         )
 
     # =====================================================
@@ -1437,6 +1435,8 @@ class Component(component.Main):
         self.ikhArmTwist.attr("dWorldUpVectorY").set(0.0)
         self.ikhArmTwist.attr("dWorldUpVectorEndZ").set(1.0)
         self.ikhArmTwist.attr("dWorldUpVectorEndY").set(0.0)
+        if self.negate:
+            self.ikhArmTwist.attr("dForwardAxis").set(1)
 
         pm.connectAttr(
             self.armRollRef[0].attr("worldMatrix[0]"),
@@ -1877,6 +1877,10 @@ class Component(component.Main):
             self.volume_blenshape_mult_att,
             self.volume_blenshape_att,
         )
+
+        # recover hand offset transform
+        if self.settings["use_blade"]:
+            self.eff_jnt_off.setMatrix(self.off_t, worldSpace=True)
 
     # =====================================================
     # CONNECTOR

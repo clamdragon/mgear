@@ -456,7 +456,25 @@ class Main(object):
                         dm_node = node.createDecomposeMatrixNode(
                             mulmat_node.matrixSum
                         )
-                        pm.connectAttr(dm_node.outputScale, jnt.s)
+                        # check if there is negative scaling and compensate
+                        invert_scale = []
+                        for v in dm_node.outputScale.get():
+                            if v < 0:
+                                invert_scale.append(-1.0)
+                            else:
+                                invert_scale.append(1.0)
+                        if -1.0 in invert_scale:
+                            node.createMulNode(
+                                [
+                                    dm_node.outputScaleX,
+                                    dm_node.outputScaleY,
+                                    dm_node.outputScaleZ,
+                                ],
+                                invert_scale,
+                                [jnt.sx, jnt.sy, jnt.sz],
+                            )
+                        else:
+                            pm.connectAttr(dm_node.outputScale, jnt.s)
 
                     else:
                         srt = "srt"
@@ -552,7 +570,9 @@ class Main(object):
         if guide_relative:
             if not jnt.hasAttr("guide_relative"):
                 attribute.addAttribute(jnt, "guide_relative", "string")
-            jnt.guide_relative.set(guide_relative)
+            jnt.guide_relative.set(
+                "{}_{}".format(self.fullName, guide_relative)
+            )
 
         if data_contracts:
             if not jnt.hasAttr("data_contracts"):

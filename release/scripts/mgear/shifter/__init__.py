@@ -84,9 +84,7 @@ def log_window():
             pm.setParent("..")
             pm.showWindow(log_win)
         else:
-            pm.cmdScrollFieldReporter(
-                log_window_field_reporter, e=True, clr=True
-            )
+            pm.cmdScrollFieldReporter(log_window_field_reporter, e=True, clr=True)
             pm.showWindow(log_window_name)
         mgear.logInfos()
 
@@ -178,6 +176,8 @@ class Rig(object):
 
         self.build_data = {}
 
+        self.component_finalize = False
+
     def buildFromDict(self, conf_dict):
         log_window()
         startTime = datetime.datetime.now()
@@ -190,9 +190,7 @@ class Rig(object):
         finalTime = endTime - startTime
         mgear.log(
             "\n"
-            + "= SHIFTER FILE READ {} [ {} ] {}".format(
-                "=" * 16, finalTime, "=" * 7
-            )
+            + "= SHIFTER FILE READ {} [ {} ] {}".format("=" * 16, finalTime, "=" * 7)
         )
 
         # Build
@@ -362,16 +360,12 @@ class Rig(object):
 
         # --------------------------------------------------
         # Model
-        self.model = primitive.addTransformFromPos(
-            None, self.options["rig_name"]
-        )
+        self.model = primitive.addTransformFromPos(None, self.options["rig_name"])
         attribute.lockAttribute(self.model)
 
         # --------------------------------------------------
         # INFOS
-        self.isRig_att = attribute.addAttribute(
-            self.model, "is_rig", "bool", True
-        )
+        self.isRig_att = attribute.addAttribute(self.model, "is_rig", "bool", True)
         self.rigName_att = attribute.addAttribute(
             self.model, "rig_name", "string", self.options["rig_name"]
         )
@@ -399,47 +393,29 @@ class Rig(object):
         self.comments_att = attribute.addAttribute(
             self.model, "comments", "string", str(self.options["comments"])
         )
-        self.ctlVis_att = attribute.addAttribute(
-            self.model, "ctl_vis", "bool", True
-        )
+        self.ctlVis_att = attribute.addAttribute(self.model, "ctl_vis", "bool", True)
         if versions.current() >= 201650:
             self.ctlVisPlayback_att = attribute.addAttribute(
                 self.model, "ctl_vis_on_playback", "bool", True
             )
-        self.jntVis_att = attribute.addAttribute(
-            self.model, "jnt_vis", "bool", True
-        )
+        self.jntVis_att = attribute.addAttribute(self.model, "jnt_vis", "bool", True)
         # adding the always draw shapes on top to global attribute
         if versions.current() >= 20220000:
             self.ctlXRay_att = attribute.addAttribute(
                 self.model, "ctl_x_ray", "bool", False
             )
 
-        self.qsA_att = attribute.addAttribute(
-            self.model, "quickselA", "string", ""
-        )
-        self.qsB_att = attribute.addAttribute(
-            self.model, "quickselB", "string", ""
-        )
-        self.qsC_att = attribute.addAttribute(
-            self.model, "quickselC", "string", ""
-        )
-        self.qsD_att = attribute.addAttribute(
-            self.model, "quickselD", "string", ""
-        )
-        self.qsE_att = attribute.addAttribute(
-            self.model, "quickselE", "string", ""
-        )
-        self.qsF_att = attribute.addAttribute(
-            self.model, "quickselF", "string", ""
-        )
+        self.qsA_att = attribute.addAttribute(self.model, "quickselA", "string", "")
+        self.qsB_att = attribute.addAttribute(self.model, "quickselB", "string", "")
+        self.qsC_att = attribute.addAttribute(self.model, "quickselC", "string", "")
+        self.qsD_att = attribute.addAttribute(self.model, "quickselD", "string", "")
+        self.qsE_att = attribute.addAttribute(self.model, "quickselE", "string", "")
+        self.qsF_att = attribute.addAttribute(self.model, "quickselF", "string", "")
 
         self.rigGroups = self.model.addAttr("rigGroups", at="message", m=1)
         self.rigPoses = self.model.addAttr("rigPoses", at="message", m=1)
         self.rigCtlTags = self.model.addAttr("rigCtlTags", at="message", m=1)
-        self.rigScriptNodes = self.model.addAttr(
-            "rigScriptNodes", at="message", m=1
-        )
+        self.rigScriptNodes = self.model.addAttr("rigScriptNodes", at="message", m=1)
 
         # ------------------------- -------------------------
         # Global Ctl
@@ -517,10 +493,10 @@ class Rig(object):
             # for count, compName in enumerate(self.componentsIndex):
             for compName in self.componentsIndex:
                 comp = self.components[compName]
-                mgear.log(
-                    name + " : " + comp.fullName + " (" + comp.type + ")"
-                )
+                mgear.log(name + " : " + comp.fullName + " (" + comp.type + ")")
                 comp.stepMethods[i]()
+                if name == "Finalize":
+                    self.component_finalize = True
 
             if self.options["step"] >= 1 and i >= self.options["step"] - 1:
                 break
@@ -588,6 +564,13 @@ class Rig(object):
         pm.connectAttr(dag_node.message, self.model.rigPoses[0])
         print(dag_node)
 
+        # hide all DG nodes inputs in channel box -----------------------
+        # only hides if components_finalize or All steps are done
+        if self.component_finalize:
+            for c in self.model.listHistory(ac=True, f=True):
+                if c.type() != "transform":
+                    c.isHistoricallyInteresting.set(False)
+
         # Bind skin re-apply
         if self.options["importSkin"]:
             try:
@@ -628,15 +611,12 @@ class Rig(object):
             file_path (Str, optional): Output path for the Json File
         """
         if not file_path:
-            ext_filter = "Shifter Collected data (*{})".format(
-                guide.DATA_COLLECTOR_EXT
-            )
+            ext_filter = "Shifter Collected data (*{})".format(guide.DATA_COLLECTOR_EXT)
             file_path = pm.fileDialog2(fileMode=0, fileFilter=ext_filter)[0]
 
-        f = open(file_path, "w")
-        f.write(json.dumps(self.build_data, indent=4))
-        f.close()
-        file_path = None
+        with open(file_path, "w") as f:
+            f.write(json.dumps(self.build_data, indent=4))
+            file_path = None
 
     def add_collected_data_to_root_jnt(self, root_jnt=None):
         """Add collected data to root joint
@@ -667,9 +647,7 @@ class Rig(object):
             try:
                 return pm.PyNode(j_name)
             except pm.MayaNodeError:
-                pm.displayError(
-                    "{} doesn't exist or is not unique".format(j_name)
-                )
+                pm.displayError("{} doesn't exist or is not unique".format(j_name))
 
     def addCtl(self, parent, name, m, color, iconShape, **kwargs):
         """Create the control and apply the shape, if this is alrealdy stored
@@ -708,9 +686,7 @@ class Rig(object):
             oShape.isHistoricallyInteresting.set(False)
             # connecting the always draw shapes on top to global attribute
             if versions.current() >= 20220000:
-                pm.connectAttr(
-                    self.ctlXRay_att, oShape.attr("alwaysDrawOnTop")
-                )
+                pm.connectAttr(self.ctlXRay_att, oShape.attr("alwaysDrawOnTop"))
 
         # set controller tag
         if versions.current() >= 201650:
@@ -927,8 +903,6 @@ class Rig(object):
             return self.ui
 
         if self.components[comp_name].ui is None:
-            self.components[comp_name].ui = pm.UIHost(
-                self.components[comp_name].root
-            )
+            self.components[comp_name].ui = pm.UIHost(self.components[comp_name].root)
 
         return self.components[comp_name].ui
