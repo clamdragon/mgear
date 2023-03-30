@@ -706,6 +706,11 @@ public:
 	static MObject aScaleMultiplierY;
 	static MObject aScaleMultiplierZ;
 
+	static MObject aDrivenInverseScale;
+	static MObject aDrivenInverseScaleX;
+	static MObject aDrivenInverseScaleY;
+	static MObject aDrivenInverseScaleZ;
+
 	// -----------------------------------------
 	// output attributes
 	// -----------------------------------------

@@ -57,6 +57,11 @@ MObject mgear_matrixConstraint::aScaleMultiplierX;
 MObject mgear_matrixConstraint::aScaleMultiplierY;
 MObject mgear_matrixConstraint::aScaleMultiplierZ;
 
+MObject mgear_matrixConstraint::aDrivenInverseScale;
+MObject mgear_matrixConstraint::aDrivenInverseScaleX;
+MObject mgear_matrixConstraint::aDrivenInverseScaleY;
+MObject mgear_matrixConstraint::aDrivenInverseScaleZ;
+
 // ---------------------------------------------------
 // output plugs
 // ---------------------------------------------------
@@ -138,6 +143,14 @@ MStatus mgear_matrixConstraint::compute(const MPlug& plug, MDataBlock& data)
 	double in_scale_multiplier_y = data.inputValue(aScaleMultiplierY, &status).asDouble();
 	double in_scale_multiplier_z = data.inputValue(aScaleMultiplierZ, &status).asDouble();
 
+	// -- optional inverse scale
+	double in_inverse_scale_x = data.inputValue(aDrivenInverseScaleX, &status).asDouble();
+	double in_inverse_scale_y = data.inputValue(aDrivenInverseScaleY, &status).asDouble();
+	double in_inverse_scale_z = data.inputValue(aDrivenInverseScaleZ, &status).asDouble();
+	MMatrix inverse_scale_matrix;
+	inverse_scale_matrix[0][0] = in_inverse_scale_x;
+	inverse_scale_matrix[1][1] = in_inverse_scale_y;
+	inverse_scale_matrix[2][2] = in_inverse_scale_z;
 
 	// -- add the rotation offset.
 	// We need to add the offset on top of the driver matrix, to calculate the outputDriverOffsetMatrix and the
@@ -152,6 +165,11 @@ MStatus mgear_matrixConstraint::compute(const MPlug& plug, MDataBlock& data)
 
 	// MMatrix mult_matrix = driver_matrix * driven_inverse_matrix;
 	MMatrix mult_matrix = driver_matrix_off.asMatrix() * driven_inverse_matrix;
+	// with SSC, translate is the one part of the xform which is calculated WITH the parent's scale
+	// so get translate now, before inverse scale is applied
+	MVector translation = MVector(mult_matrix[3][0], mult_matrix[3][1], mult_matrix[3][2]);
+	// apply SSC-style inverse scale to local mtx
+	mult_matrix = mult_matrix * inverse_scale_matrix;
 
 	// -- multiply the result of the mult matrix by the rest
 	// -- need to have the rotation calculated seperaltely - (joint orientation)
@@ -171,7 +189,7 @@ MStatus mgear_matrixConstraint::compute(const MPlug& plug, MDataBlock& data)
 	rotation.z *= in_rotation_multiplier_z;
 
 	// -- decompose the matrix values to construct into the final matrix
-	MVector translation = matrix.getTranslation(MSpace::kWorld);
+	//MVector translation = matrix.getTranslation(MSpace::kWorld);
 	matrix.getScale(scale, MSpace::kWorld);
 	matrix.getShear(shear, MSpace::kWorld);
 
@@ -303,6 +321,21 @@ MStatus mgear_matrixConstraint::initialize()
 	nAttr.setKeyable(true);
 	nAttr.setDefault(1.0, 1.0, 1.0);
 
+	aDrivenInverseScaleX = nAttr.create("drivenInverseScaleX", "drivenInverseScaleX", MFnNumericData::kDouble);
+	nAttr.setKeyable(true);
+
+	aDrivenInverseScaleY = nAttr.create("drivenInverseScaleY", "drivenInverseScaleY", MFnNumericData::kDouble);
+	nAttr.setKeyable(true);
+
+	aDrivenInverseScaleZ = nAttr.create("drivenInverseScaleZ", "drivenInverseScaleZ", MFnNumericData::kDouble);
+	nAttr.setKeyable(true);
+
+	aDrivenInverseScale = nAttr.create("drivenInverseScale", "drivenInverseScale", aDrivenInverseScaleX, aDrivenInverseScaleY, aDrivenInverseScaleZ);
+	nAttr.setKeyable(true);
+	nAttr.setWritable(true);
+	nAttr.setStorable(true);
+	nAttr.setDefault(1.0, 1.0, 1.0);
+
 	// -----------------------------------------
 	// output attributes
 	// -----------------------------------------
@@ -403,6 +436,10 @@ MStatus mgear_matrixConstraint::initialize()
 	addAttribute(aScaleMultiplierX);
 	addAttribute(aScaleMultiplierY);
 	addAttribute(aScaleMultiplierZ);
+	addAttribute(aDrivenInverseScale);
+	addAttribute(aDrivenInverseScaleX);
+	addAttribute(aDrivenInverseScaleY);
+	addAttribute(aDrivenInverseScaleZ);
 
 	addAttribute(aOutputMatrix);
 	addAttribute(aDriverOffsetOutputMatrix);
@@ -437,6 +474,7 @@ MStatus mgear_matrixConstraint::initialize()
 	attributeAffects(aRotationMultiplier, aOutputMatrix);
 	attributeAffects(aDriverRotationOffset, aOutputMatrix);
 	attributeAffects(aScaleMultiplier, aOutputMatrix);
+	attributeAffects(aDrivenInverseScale, aOutputMatrix);
 
 	attributeAffects(aDriverMatrix, aDriverOffsetOutputMatrix);
 	// attributeAffects(aDrivenParentInverseMatrix, aDriverOffsetOutputMatrix);
@@ -473,6 +511,11 @@ MStatus mgear_matrixConstraint::initialize()
 	attributeAffects(aDrivenRestMatrix, aRotate);
 	attributeAffects(aDrivenRestMatrix, aScale);
 	attributeAffects(aDrivenRestMatrix, aShear);
+
+	attributeAffects(aDrivenInverseScale, aTranslate);
+	attributeAffects(aDrivenInverseScale, aRotate);
+	attributeAffects(aDrivenInverseScale, aScale);
+	attributeAffects(aDrivenInverseScale, aShear);
 
 	return MS::kSuccess;
 }

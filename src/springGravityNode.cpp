@@ -152,9 +152,9 @@ MStatus mgear_springGravityNode::initialize()
 	attributeAffects(aGravity, aOutput);
 
 	aGravityDirection = nAttr.createPoint("gravity_direction", "gravity_direction");
-  nAttr.setDefault(0.0f, -1.0f, 0.0f);
+	nAttr.setDefault(0.0f, -1.0f, 0.0f);
 	nAttr.setKeyable(true);
-	nAttr.setStorable(false);
+	//nAttr.setStorable(false);
 	addAttribute(aGravityDirection);
 	attributeAffects(aGravityDirection, aOutput);
 
@@ -172,11 +172,11 @@ MStatus mgear_springGravityNode::initialize()
 	attributeAffects(aUseGroundPlane, aOutput);
 
 	aGroundPlaneTransform = mAttr.create("ground_transform", "ground_transform");
-  mAttr.setStorable(true);
-  mAttr.setKeyable(true);
-  mAttr.setConnectable(true);
-  addAttribute(aGroundPlaneTransform);
-  attributeAffects(aGroundPlaneTransform, aOutput);
+	mAttr.setStorable(true);
+	mAttr.setKeyable(true);
+	mAttr.setConnectable(true);
+	addAttribute(aGroundPlaneTransform);
+	attributeAffects(aGroundPlaneTransform, aOutput);
 
 	aCollider = nAttr.createPoint("collider", "collider");
 	aColliderX = nAttr.child(0);
@@ -279,7 +279,7 @@ MStatus mgear_springGravityNode::compute(const MPlug& plug, MDataBlock& data)
 	MVector colliderPos;
 	MVector distFromCollider;
 	double colliderRadius;
-  double collideAmount;
+	double collideAmount;
 	MArrayDataHandle arrayHandle = data.inputArrayValue(aColliderList, &status);
 	McheckErr(status, "arrayHandle construction for aColliderList failed\n");
 	unsigned count = arrayHandle.elementCount();
@@ -298,12 +298,12 @@ MStatus mgear_springGravityNode::compute(const MPlug& plug, MDataBlock& data)
 
 	MMatrix groundPlaneTransform = data.inputValue(aGroundPlaneTransform, &status).asMatrix();
 	MMatrix groundPlaneInv = groundPlaneTransform.inverse();
-  double groundPlaneHeight = groundPlaneTransform(4, 2);
+	double groundPlaneHeight = groundPlaneTransform(4, 2);
 
   // Collide with a general plane
 	bool useGroundPlane = data.inputValue(aUseGroundPlane, &status).asBool();
-  MPoint transformedPosition = newPosition;
-  transformedPosition *= groundPlaneInv;
+	MPoint transformedPosition = newPosition;
+	transformedPosition *= groundPlaneInv;
 	double distFromGround = transformedPosition[1] - groundPlaneHeight;
 	collideAmount = -1.0f * distFromGround * colliderStrength;
 

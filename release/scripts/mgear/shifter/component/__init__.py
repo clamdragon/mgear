@@ -453,6 +453,12 @@ class Main(object):
                         mulmat_node = node.createMultMatrixNode(
                             driver.worldMatrix, self.root.worldInverseMatrix
                         )
+                        # joint rot offset needs to be taken into account for scale
+                        if rot_off != [0, 0, 0]:
+                            mulmat_node = node.createMultMatrixNode(
+                                datatypes.EulerRotation(rot_off).asMatrix(),
+                                mulmat_node.matrixSum
+                            )
                         dm_node = node.createDecomposeMatrixNode(
                             mulmat_node.matrixSum
                         )
@@ -481,6 +487,8 @@ class Main(object):
                     cns_m = applyop.gear_matrix_cns(
                         driver, jnt, rot_off=rot_off, connect_srt=srt
                     )
+                    if segComp:
+                        pm.connectAttr(jnt.inverseScale, cns_m.drivenInverseScale)
 
                     # invert negative scaling in Joints. We only inver Z axis,
                     # so is the only axis that we are checking
