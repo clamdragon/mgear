@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'C:/datawork/repo/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_neck_01/settingsUI.ui',
-# licensing of 'C:/datawork/repo/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_neck_01/settingsUI.ui' applies.
+# Form implementation generated from reading ui file 'C:/Users/Brendan/OneDrive/3D/ROBOT/ArtTools/mainline/Maya/modules/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_neck_01/settingsUI.ui',
+# licensing of 'C:/Users/Brendan/OneDrive/3D/ROBOT/ArtTools/mainline/Maya/modules/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_neck_01/settingsUI.ui' applies.
 #
-# Created: Thu Jan 19 11:29:20 2023
+# Created: Thu Mar 23 15:01:54 2023
 #      by: pyside2-uic  running on PySide2 5.12.5
 #
 # WARNING! All changes made in this file will be lost!
@@ -13,7 +13,7 @@ from PySide2 import QtCore, QtGui, QtWidgets
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
-        Form.resize(238, 538)
+        Form.resize(238, 565)
         self.gridLayout = QtWidgets.QGridLayout(Form)
         self.gridLayout.setObjectName("gridLayout")
         self.groupBox = QtWidgets.QGroupBox(Form)
@@ -110,6 +110,30 @@ class Ui_Form(object):
         self.leafJoints_checkBox.setText("")
         self.leafJoints_checkBox.setObjectName("leafJoints_checkBox")
         self.formLayout.setWidget(6, QtWidgets.QFormLayout.FieldRole, self.leafJoints_checkBox)
+        self.aimAxis_label = QtWidgets.QLabel(self.groupBox)
+        self.aimAxis_label.setObjectName("aimAxis_label")
+        self.formLayout.setWidget(7, QtWidgets.QFormLayout.LabelRole, self.aimAxis_label)
+        self.aimAxis_comboBox = QtWidgets.QComboBox(self.groupBox)
+        self.aimAxis_comboBox.setObjectName("aimAxis_comboBox")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.formLayout.setWidget(7, QtWidgets.QFormLayout.FieldRole, self.aimAxis_comboBox)
+        self.bendAxis_label = QtWidgets.QLabel(self.groupBox)
+        self.bendAxis_label.setObjectName("bendAxis_label")
+        self.formLayout.setWidget(8, QtWidgets.QFormLayout.LabelRole, self.bendAxis_label)
+        self.bendAxis_comboBox = QtWidgets.QComboBox(self.groupBox)
+        self.bendAxis_comboBox.setObjectName("bendAxis_comboBox")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.formLayout.setWidget(8, QtWidgets.QFormLayout.FieldRole, self.bendAxis_comboBox)
         self.verticalLayout.addLayout(self.formLayout)
         self.squashStretchProfile_pushButton = QtWidgets.QPushButton(self.groupBox)
         self.squashStretchProfile_pushButton.setObjectName("squashStretchProfile_pushButton")
@@ -196,6 +220,8 @@ class Ui_Form(object):
         self.gridLayout.addWidget(self.upvRefArray_groupBox, 2, 0, 1, 1)
 
         self.retranslateUi(Form)
+        self.aimAxis_comboBox.setCurrentIndex(1)
+        self.bendAxis_comboBox.setCurrentIndex(3)
         QtCore.QObject.connect(self.softness_slider, QtCore.SIGNAL("sliderMoved(int)"), self.softness_spinBox.setValue)
         QtCore.QObject.connect(self.softness_spinBox, QtCore.SIGNAL("valueChanged(int)"), self.softness_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
@@ -211,6 +237,20 @@ class Ui_Form(object):
         self.IKWorldOri_checkBox.setToolTip(QtWidgets.QApplication.translate("Form", "If checked, the IK control will be aligned to the world space", None, -1))
         self.leafJoints_label.setText(QtWidgets.QApplication.translate("Form", "Leaf Joints", None, -1))
         self.leafJoints_checkBox.setToolTip(QtWidgets.QApplication.translate("Form", "If checked, the IK control will be aligned to the world space", None, -1))
+        self.aimAxis_label.setText(QtWidgets.QApplication.translate("Form", "Aim Axis", None, -1))
+        self.aimAxis_comboBox.setItemText(0, QtWidgets.QApplication.translate("Form", "X", None, -1))
+        self.aimAxis_comboBox.setItemText(1, QtWidgets.QApplication.translate("Form", "Y", None, -1))
+        self.aimAxis_comboBox.setItemText(2, QtWidgets.QApplication.translate("Form", "Z", None, -1))
+        self.aimAxis_comboBox.setItemText(3, QtWidgets.QApplication.translate("Form", "-X", None, -1))
+        self.aimAxis_comboBox.setItemText(4, QtWidgets.QApplication.translate("Form", "-Y", None, -1))
+        self.aimAxis_comboBox.setItemText(5, QtWidgets.QApplication.translate("Form", "-Z", None, -1))
+        self.bendAxis_label.setText(QtWidgets.QApplication.translate("Form", "Bend Axis", None, -1))
+        self.bendAxis_comboBox.setItemText(0, QtWidgets.QApplication.translate("Form", "X", None, -1))
+        self.bendAxis_comboBox.setItemText(1, QtWidgets.QApplication.translate("Form", "Y", None, -1))
+        self.bendAxis_comboBox.setItemText(2, QtWidgets.QApplication.translate("Form", "Z", None, -1))
+        self.bendAxis_comboBox.setItemText(3, QtWidgets.QApplication.translate("Form", "-X", None, -1))
+        self.bendAxis_comboBox.setItemText(4, QtWidgets.QApplication.translate("Form", "-Y", None, -1))
+        self.bendAxis_comboBox.setItemText(5, QtWidgets.QApplication.translate("Form", "-Z", None, -1))
         self.squashStretchProfile_pushButton.setText(QtWidgets.QApplication.translate("Form", "Squash and Stretch Profile", None, -1))
         self.ikRefArray_groupBox.setTitle(QtWidgets.QApplication.translate("Form", "IK Reference Array", None, -1))
         self.chickenStyle_label.setText(QtWidgets.QApplication.translate("Form", "Chicken style IK", None, -1))

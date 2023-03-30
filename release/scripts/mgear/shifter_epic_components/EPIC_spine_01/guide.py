@@ -117,6 +117,12 @@ class Guide(guide.ComponentGuide):
         self.pAutoBend = self.addParam("autoBend", "bool", True)
         self.pCentralTangent = self.addParam("centralTangent", "bool", True)
         self.pIKWorldOri = self.addParam("IKWorldOri", "bool", True)
+        self.pAimAxis = self.addEnumParam(
+            "aimAxis", ["X", "Y", "Z", "-X", "-Y", "-Z"], 1
+        )
+        self.pBendAxis = self.addEnumParam(
+            "bendAxis", ["X", "Y", "Z", "-X", "-Y", "-Z"], 0
+        )
 
         # FCurves
         self.pSt_profile = self.addFCurveParam(
@@ -232,6 +238,12 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             self.settingsTab.centralTangent_checkBox, "centralTangent"
         )
         self.populateCheck(self.settingsTab.leafJoints_checkBox, "leafJoints")
+        self.settingsTab.aimAxis_comboBox.setCurrentIndex(
+            self.root.attr("aimAxis").get()
+        )
+        self.settingsTab.bendAxis_comboBox.setCurrentIndex(
+            self.root.attr("bendAxis").get()
+        )
 
     def create_componentLayout(self):
 
@@ -346,6 +358,22 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 self.updateCheck,
                 self.settingsTab.leafJoints_checkBox,
                 "leafJoints",
+            )
+        )
+
+        self.settingsTab.aimAxis_comboBox.currentIndexChanged.connect(
+            partial(
+                self.updateComboBox,
+                self.settingsTab.aimAxis_comboBox,
+                "aimAxis"
+            )
+        )
+
+        self.settingsTab.bendAxis_comboBox.currentIndexChanged.connect(
+            partial(
+                self.updateComboBox,
+                self.settingsTab.bendAxis_comboBox,
+                "bendAxis"
             )
         )
 

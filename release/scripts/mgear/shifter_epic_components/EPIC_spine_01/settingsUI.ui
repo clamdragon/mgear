@@ -294,7 +294,7 @@
         </property>
        </widget>
       </item>
-      <item row="12" column="0" colspan="2">
+      <item row="13" column="0" colspan="2">
        <widget class="QPushButton" name="squashStretchProfile_pushButton">
         <property name="text">
          <string>Squash and Stretch Profile</string>
@@ -312,6 +312,94 @@
        <widget class="QLabel" name="leafJoints_label">
         <property name="text">
          <string>Leaf Joints</string>
+        </property>
+       </widget>
+      </item>
+      <item row="11" column="0">
+       <widget class="QLabel" name="aimAxis_label">
+        <property name="text">
+         <string>Aim Axis</string>
+        </property>
+       </widget>
+      </item>
+      <item row="11" column="1">
+       <widget class="QComboBox" name="aimAxis_comboBox">
+        <property name="currentIndex">
+         <number>1</number>
+        </property>
+        <item>
+         <property name="text">
+          <string>X</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Y</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Z</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>-X</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>-Y</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>-Z</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="12" column="1">
+       <widget class="QComboBox" name="bendAxis_comboBox">
+        <property name="currentIndex">
+         <number>3</number>
+        </property>
+        <item>
+         <property name="text">
+          <string>X</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Y</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Z</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>-X</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>-Y</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>-Z</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="12" column="0">
+       <widget class="QLabel" name="bendAxis_label">
+        <property name="text">
+         <string>Bend Axis</string>
         </property>
        </widget>
       </item>

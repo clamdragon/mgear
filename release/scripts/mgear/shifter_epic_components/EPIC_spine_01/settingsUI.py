@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'C:/datawork/repo/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_spine_01/settingsUI.ui',
-# licensing of 'C:/datawork/repo/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_spine_01/settingsUI.ui' applies.
+# Form implementation generated from reading ui file 'C:/Users/Brendan/OneDrive/3D/ROBOT/ArtTools/mainline/Maya/modules/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_spine_01/settingsUI.ui',
+# licensing of 'C:/Users/Brendan/OneDrive/3D/ROBOT/ArtTools/mainline/Maya/modules/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_spine_01/settingsUI.ui' applies.
 #
-# Created: Thu Jan 19 11:29:12 2023
+# Created: Thu Mar 23 15:01:32 2023
 #      by: pyside2-uic  running on PySide2 5.12.5
 #
 # WARNING! All changes made in this file will be lost!
@@ -13,7 +13,7 @@ from PySide2 import QtCore, QtGui, QtWidgets
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
-        Form.resize(279, 308)
+        Form.resize(279, 410)
         self.gridLayout = QtWidgets.QGridLayout(Form)
         self.gridLayout.setObjectName("gridLayout")
         self.groupBox = QtWidgets.QGroupBox(Form)
@@ -161,7 +161,7 @@ class Ui_Form(object):
         self.formLayout.setWidget(9, QtWidgets.QFormLayout.FieldRole, self.centralTangent_checkBox)
         self.squashStretchProfile_pushButton = QtWidgets.QPushButton(self.groupBox)
         self.squashStretchProfile_pushButton.setObjectName("squashStretchProfile_pushButton")
-        self.formLayout.setWidget(12, QtWidgets.QFormLayout.SpanningRole, self.squashStretchProfile_pushButton)
+        self.formLayout.setWidget(13, QtWidgets.QFormLayout.SpanningRole, self.squashStretchProfile_pushButton)
         self.leafJoints_checkBox = QtWidgets.QCheckBox(self.groupBox)
         self.leafJoints_checkBox.setText("")
         self.leafJoints_checkBox.setObjectName("leafJoints_checkBox")
@@ -169,9 +169,37 @@ class Ui_Form(object):
         self.leafJoints_label = QtWidgets.QLabel(self.groupBox)
         self.leafJoints_label.setObjectName("leafJoints_label")
         self.formLayout.setWidget(10, QtWidgets.QFormLayout.LabelRole, self.leafJoints_label)
+        self.aimAxis_label = QtWidgets.QLabel(self.groupBox)
+        self.aimAxis_label.setObjectName("aimAxis_label")
+        self.formLayout.setWidget(11, QtWidgets.QFormLayout.LabelRole, self.aimAxis_label)
+        self.aimAxis_comboBox = QtWidgets.QComboBox(self.groupBox)
+        self.aimAxis_comboBox.setObjectName("aimAxis_comboBox")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.aimAxis_comboBox.addItem("")
+        self.formLayout.setWidget(11, QtWidgets.QFormLayout.FieldRole, self.aimAxis_comboBox)
+        self.bendAxis_comboBox = QtWidgets.QComboBox(self.groupBox)
+        self.bendAxis_comboBox.setObjectName("bendAxis_comboBox")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.bendAxis_comboBox.addItem("")
+        self.formLayout.setWidget(12, QtWidgets.QFormLayout.FieldRole, self.bendAxis_comboBox)
+        self.bendAxis_label = QtWidgets.QLabel(self.groupBox)
+        self.bendAxis_label.setObjectName("bendAxis_label")
+        self.formLayout.setWidget(12, QtWidgets.QFormLayout.LabelRole, self.bendAxis_label)
         self.gridLayout.addWidget(self.groupBox, 0, 0, 1, 1)
+        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.gridLayout.addItem(spacerItem, 1, 0, 1, 1)
 
         self.retranslateUi(Form)
+        self.aimAxis_comboBox.setCurrentIndex(1)
+        self.bendAxis_comboBox.setCurrentIndex(3)
         QtCore.QObject.connect(self.softness_slider, QtCore.SIGNAL("sliderMoved(int)"), self.softness_spinBox.setValue)
         QtCore.QObject.connect(self.softness_spinBox, QtCore.SIGNAL("valueChanged(int)"), self.softness_slider.setValue)
         QtCore.QObject.connect(self.position_slider, QtCore.SIGNAL("valueChanged(int)"), self.position_spinBox.setValue)
@@ -196,4 +224,18 @@ class Ui_Form(object):
         self.centralTangent_label.setText(QtWidgets.QApplication.translate("Form", "Central Tangent", None, -1))
         self.squashStretchProfile_pushButton.setText(QtWidgets.QApplication.translate("Form", "Squash and Stretch Profile", None, -1))
         self.leafJoints_label.setText(QtWidgets.QApplication.translate("Form", "Leaf Joints", None, -1))
+        self.aimAxis_label.setText(QtWidgets.QApplication.translate("Form", "Aim Axis", None, -1))
+        self.aimAxis_comboBox.setItemText(0, QtWidgets.QApplication.translate("Form", "X", None, -1))
+        self.aimAxis_comboBox.setItemText(1, QtWidgets.QApplication.translate("Form", "Y", None, -1))
+        self.aimAxis_comboBox.setItemText(2, QtWidgets.QApplication.translate("Form", "Z", None, -1))
+        self.aimAxis_comboBox.setItemText(3, QtWidgets.QApplication.translate("Form", "-X", None, -1))
+        self.aimAxis_comboBox.setItemText(4, QtWidgets.QApplication.translate("Form", "-Y", None, -1))
+        self.aimAxis_comboBox.setItemText(5, QtWidgets.QApplication.translate("Form", "-Z", None, -1))
+        self.bendAxis_comboBox.setItemText(0, QtWidgets.QApplication.translate("Form", "X", None, -1))
+        self.bendAxis_comboBox.setItemText(1, QtWidgets.QApplication.translate("Form", "Y", None, -1))
+        self.bendAxis_comboBox.setItemText(2, QtWidgets.QApplication.translate("Form", "Z", None, -1))
+        self.bendAxis_comboBox.setItemText(3, QtWidgets.QApplication.translate("Form", "-X", None, -1))
+        self.bendAxis_comboBox.setItemText(4, QtWidgets.QApplication.translate("Form", "-Y", None, -1))
+        self.bendAxis_comboBox.setItemText(5, QtWidgets.QApplication.translate("Form", "-Z", None, -1))
+        self.bendAxis_label.setText(QtWidgets.QApplication.translate("Form", "Bend Axis", None, -1))
 

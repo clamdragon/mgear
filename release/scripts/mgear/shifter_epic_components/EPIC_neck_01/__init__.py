@@ -14,6 +14,7 @@ from mgear.core import attribute, transform, primitive, string
 
 class Component(component.Main):
     """Shifter component Class"""
+    axes = ["XZ", "XY", "YZ", "YX", "ZY", "ZX"]
 
     # =====================================================
     # OBJECTS
@@ -28,20 +29,52 @@ class Component(component.Main):
         jdn_neck = jd_names[0]
         jdn_head = jd_names[1]
 
+        axes = ["x", "y", "z", "-x", "-y", "-z"]
+        aim_axis = axes[self.settings.get("aimAxis", 1)]
+        bend_axis = axes[self.settings.get("bendAxis", 0)]
+        if aim_axis[-1] == bend_axis[-1]:
+            # naughty naughty
+            raise ValueError("Aim and bend axes must not match.")
+        normal_axis = next(a for a in "xyz" if a not in aim_axis + bend_axis)
+        rot_order = (aim_axis[-1] + bend_axis[-1] + normal_axis[-1]).upper()
+        mirror_attrs = ["t"+bend_axis[-1], "r"+aim_axis[-1], "r"+normal_axis[-1]]
+        axis_vectors = {
+            "x": datatypes.Vector.xAxis,
+            "y": datatypes.Vector.yAxis,
+            "z": datatypes.Vector.zAxis,
+            "-x": datatypes.Vector.xNegAxis,
+            "-y": datatypes.Vector.yNegAxis,
+            "-z": datatypes.Vector.zNegAxis,
+        }
+        # default was YX so just make a matrix replacing those axes with aim/bend
+        ctrl_rot_offset = datatypes.EulerRotation.decompose(
+            datatypes.Matrix(
+                axis_vectors[bend_axis],
+                axis_vectors[aim_axis],
+                axis_vectors[normal_axis],
+                datatypes.Vector()
+            ),
+            "XYZ"
+        )
+
         self.normal = self.guide.blades["blade"].z * -1
         self.up_axis = pm.upAxis(q=True, axis=True)
 
         # Ik Controlers ------------------------------------
         if self.settings["IKWorldOri"]:
             t = datatypes.TransformationMatrix()
+            ik_mirror_attrs = ["tx", "ry", "rz"]
+            ik_rot_offset = datatypes.EulerRotation()
         else:
             t = transform.getTransformLookingAt(
                 self.guide.pos["tan1"],
                 self.guide.pos["neck"],
                 self.normal,
-                "yx",
+                aim_axis + bend_axis,
                 self.negate,
             )
+            ik_mirror_attrs = mirror_attrs
+            ik_rot_offset = ctrl_rot_offset
 
         t = transform.setMatrixPosition(t, self.guide.pos["neck"])
 
@@ -64,12 +97,13 @@ class Component(component.Main):
             self.color_ik,
             "compas",
             w=self.size * 0.5,
+            ro=ik_rot_offset,
             tp=self.parentCtlTag,
         )
 
         attribute.setKeyableAttributes(self.ik_ctl, self.tr_params)
-        attribute.setRotOrder(self.ik_ctl, "ZXY")
-        attribute.setInvertMirror(self.ik_ctl, ["tx", "ry", "rz"])
+        attribute.setRotOrder(self.ik_ctl, rot_order)
+        attribute.setInvertMirror(self.ik_ctl, ik_mirror_attrs)
 
         # Tangents -----------------------------------------
         if self.settings["tangentControls"]:
@@ -90,13 +124,13 @@ class Component(component.Main):
             )
 
             attribute.setKeyableAttributes(self.tan1_ctl, self.t_params)
-            attribute.setInvertMirror(self.tan1_ctl, ["tx"])
+            attribute.setInvertMirror(self.tan1_ctl, ik_mirror_attrs)
 
             t = transform.getTransformLookingAt(
                 self.guide.pos["root"],
                 self.guide.pos["tan0"],
                 self.normal,
-                "yx",
+                aim_axis + bend_axis,
                 self.negate,
             )
 
@@ -117,7 +151,7 @@ class Component(component.Main):
             )
 
             attribute.setKeyableAttributes(self.tan0_ctl, self.t_params)
-            attribute.setInvertMirror(self.tan0_ctl, ["tx"])
+            attribute.setInvertMirror(self.tan0_ctl, ik_mirror_attrs)
 
             # Curves -------------------------------------------
             self.mst_crv = curve.addCnsCurve(
@@ -147,7 +181,7 @@ class Component(component.Main):
                 self.guide.pos["root"],
                 self.guide.pos["tan0"],
                 self.normal,
-                "yx",
+                aim_axis + bend_axis,
                 self.negate,
             )
 
@@ -180,11 +214,12 @@ class Component(component.Main):
         # The user only define how many intermediate division he wants.
         # First and last divisions are an obligation.
         parentdiv = self.root
-        parentctl = self.root
+        # parentctl = self.root
         self.div_cns = []
         self.fk_ctl = []
         self.fk_npo = []
-        self.scl_npo = []
+        # self.scl_npo = []
+        self.scl_ref = []
 
         self.twister = []
         self.ref_twist = []
@@ -202,13 +237,20 @@ class Component(component.Main):
             self.guide.pos["root"],
             self.guide.pos["neck"],
             self.normal,
-            "yx",
+            aim_axis + bend_axis,
             self.negate,
         )
 
         self.intMRef = primitive.addTransform(
             self.root, self.getName("intMRef"), t
         )
+
+        self.scl_npo = primitive.addTransform(
+            self.root,
+            self.getName("scl_npo"),
+            transform.getTransform(self.root),
+        )
+        parentctl = self.scl_npo
 
         self.previousCtlTag = self.parentCtlTag
         for i in range(self.divisions):
@@ -222,25 +264,25 @@ class Component(component.Main):
             self.div_cns.append(div_cns)
             parentdiv = div_cns
 
-            scl_npo = primitive.addTransform(
-                parentctl,
-                self.getName("%s_scl_npo" % i),
-                transform.getTransform(parentctl),
-            )
+            # scl_npo = primitive.addTransform(
+            #     self.root,
+            #     self.getName("%s_scl_npo" % i),
+            #     transform.getTransform(parentctl),
+            # )
 
             # Controlers (First and last one are fake)
-
-            if i in [self.divisions - 1]:  # 0,
+            if i == self.divisions - 1:
                 fk_ctl = primitive.addTransform(
-                    scl_npo,
+                    parentctl,
                     self.getName("%s_loc" % i),
                     transform.getTransform(parentctl),
                 )
 
                 fk_npo = fk_ctl
             else:
+                # all but the last one (head)
                 fk_npo = primitive.addTransform(
-                    scl_npo,
+                    parentctl,
                     self.getName("fk%s_npo" % i),
                     transform.getTransform(parentctl),
                 )
@@ -254,28 +296,30 @@ class Component(component.Main):
                     w=self.size * 0.2,
                     h=self.size * 0.05,
                     d=self.size * 0.2,
+                    ro = ctrl_rot_offset,
                     tp=self.previousCtlTag,
                 )
 
                 attribute.setKeyableAttributes(self.fk_ctl)
-                attribute.setRotOrder(fk_ctl, "ZXY")
+                attribute.setRotOrder(fk_ctl, rot_order)
 
                 self.previousCtlTag = fk_ctl
 
-            self.fk_ctl.append(fk_ctl)
+                scl_ref = primitive.addTransform(
+                    fk_ctl,
+                    self.getName("%s_scl_ref" % i),
+                    transform.getTransform(parentctl),
+                )
+                self.scl_ref.append(scl_ref)
 
-            self.scl_npo.append(scl_npo)
-            self.fk_npo.append(fk_npo)
-            parentctl = fk_ctl
-
-            if i != self.divisions - 1:
                 if i == 0:
                     guide_relative = "root"
                 else:
                     guide_relative = None
+
                 self.jnt_pos.append(
                     {
-                        "obj": fk_ctl,
+                        "obj": scl_ref,
                         "name": string.replaceSharpWithPadding(
                             jdn_neck, i + 1
                         ),
@@ -285,11 +329,16 @@ class Component(component.Main):
                     }
                 )
 
+            self.fk_ctl.append(fk_ctl)
+            # self.scl_npo.append(scl_npo)
+            self.fk_npo.append(fk_npo)
+            parentctl = fk_ctl
+
             t = transform.getTransformLookingAt(
                 self.guide.pos["root"],
                 self.guide.pos["neck"],
-                self.guide.blades["blade"].z * -1,
-                "yx",
+                self.normal,
+                aim_axis + bend_axis,
                 self.negate,
             )
 
@@ -302,21 +351,21 @@ class Component(component.Main):
             )
 
             ref_twist.setTranslation(
-                datatypes.Vector(0.0, 0, 1.0), space="preTransform"
+                axis_vectors[bend_axis], space="preTransform"
             )
 
             self.twister.append(twister)
             self.ref_twist.append(ref_twist)
 
         for x in self.fk_ctl[:-1]:
-            attribute.setInvertMirror(x, ["tx", "rz", "ry"])
+            attribute.setInvertMirror(x, mirror_attrs)
 
         # Head ---------------------------------------------
         t = transform.getTransformLookingAt(
             self.guide.pos["head"],
             self.guide.pos["eff"],
             self.normal,
-            "yx",
+            aim_axis + bend_axis,
             self.negate,
         )
 
@@ -337,16 +386,24 @@ class Component(component.Main):
             w=self.size * 0.5,
             h=dist,
             d=self.size * 0.5,
-            po=datatypes.Vector(0, dist * 0.5, 0),
+            po=axis_vectors[aim_axis] * dist * 0.5,
+            ro=ctrl_rot_offset,
             tp=self.previousCtlTag,
         )
 
-        attribute.setRotOrder(self.head_ctl, "ZXY")
-        attribute.setInvertMirror(self.head_ctl, ["tx", "rz", "ry"])
+        head_ref = primitive.addTransform(
+                self.head_ctl,
+                self.getName("head_scl_ref"),
+                t,
+            )
+        self.scl_ref.append(head_ref)
+
+        attribute.setRotOrder(self.head_ctl, rot_order)
+        attribute.setInvertMirror(self.head_ctl, mirror_attrs)
 
         self.jnt_pos.append(
             {
-                "obj": self.head_ctl,
+                "obj": head_ref,
                 "name": jdn_head,
                 "guide_relative": "neck",
             }
@@ -460,6 +517,10 @@ class Component(component.Main):
         we shouldn't create any new object in this method.
 
         """
+        axes = ["x", "y", "z", "-x", "-y", "-z"]
+        aim_axis = axes[self.settings.get("aimAxis", 1)]
+        bend_axis = axes[self.settings.get("bendAxis", 3)]
+
         # Tangent position ---------------------------------
         # common part
         d = vector.getDistance(self.guide.pos["root"], self.guide.pos["neck"])
@@ -473,22 +534,31 @@ class Component(component.Main):
         div_node = node.createDivNode(div_node + ".outputX", d)
 
         # tan0
+        # sometimes it's not perfectly vertical - blend ALL translate channels
         mul_node = node.createMulNode(
-            self.tan0_att, self.tan0_loc.getAttr("ty")
+            [self.tan0_att, self.tan0_att, self.tan0_att],
+            list(self.tan0_loc.getAttr("translate"))
         )
         res_node = node.createMulNode(
-            mul_node + ".outputX", div_node + ".outputX"
+            mul_node + ".output",
+            [div_node + ".outputX",
+            div_node + ".outputX",
+            div_node + ".outputX"]
         )
-        pm.connectAttr(res_node + ".outputX", self.tan0_loc + ".ty")
+        pm.connectAttr(res_node + ".output", self.tan0_loc.attr("translate"))
 
         # tan1
         mul_node = node.createMulNode(
-            self.tan1_att, self.tan1_loc.getAttr("ty")
+            [self.tan1_att, self.tan1_att, self.tan1_att],
+            list(self.tan1_loc.getAttr("translate"))
         )
         res_node = node.createMulNode(
-            mul_node + ".outputX", div_node + ".outputX"
+            mul_node + ".output",
+            [div_node + ".outputX",
+            div_node + ".outputX",
+            div_node + ".outputX"]
         )
-        pm.connectAttr(res_node + ".outputX", self.tan1_loc.attr("ty"))
+        pm.connectAttr(res_node + ".output", self.tan1_loc.attr("translate"))
 
         # Curves -------------------------------------------
         op = applyop.gear_curveslide2_op(
@@ -510,12 +580,21 @@ class Component(component.Main):
             cns = applyop.pathCns(
                 self.div_cns[i], self.slv_crv, False, u, True
             )
-            cns.setAttr("frontAxis", 1)  # front axis is 'Y'
-            cns.setAttr("upAxis", 2)  # front axis is 'Z'
+            cns.setAttr("frontAxis", aim_axis.upper()[-1])  # bone axis
+            cns.setAttr("inverseFront", "-" in aim_axis)
+            cns.setAttr("upAxis", bend_axis.upper()[-1]) # bend axis
+            cns.setAttr("inverseUp", "-" in bend_axis)
 
             # Roll
+            # first, offset IK control wm to align with general aim xform (intMRef)
+            # can ignore translation because it's not used
+            ik_t = transform.getTransform(self.ik_ctl)
+            fk_t = transform.getTransform(self.intMRef)
+            mm_node = node.createMultMatrixNode(
+                fk_t * ik_t.inverse(), self.ik_ctl + ".worldMatrix"
+            )
             intMatrix = applyop.gear_intmatrix_op(
-                self.intMRef + ".worldMatrix", self.ik_ctl + ".worldMatrix", u
+                self.intMRef + ".worldMatrix", mm_node + ".matrixSum", u
             )
             dm_node = node.createDecomposeMatrixNode(intMatrix + ".output")
             pm.connectAttr(
@@ -532,7 +611,7 @@ class Component(component.Main):
 
             # Squash n Stretch
             op = applyop.gear_squashstretch2_op(
-                self.fk_npo[i], self.root, pm.arclen(self.slv_crv), "y"
+                self.scl_ref[i], self.root, pm.arclen(self.slv_crv), aim_axis
             )
 
             pm.connectAttr(self.volume_att, op + ".blend")
@@ -542,43 +621,62 @@ class Component(component.Main):
             op.setAttr("driver_min", 0.1)
 
             # scl compas
-            if i != 0:
-                div_node = node.createDivNode(
-                    [1, 1, 1],
-                    [
-                        self.fk_npo[i - 1] + ".sx",
-                        self.fk_npo[i - 1] + ".sy",
-                        self.fk_npo[i - 1] + ".sz",
-                    ],
-                )
-
-                pm.connectAttr(
-                    div_node + ".output", self.scl_npo[i] + ".scale"
-                )
+            # if i != 0:
+            #     div_node = node.createDivNode(
+            #         [1, 1, 1],
+            #         [
+            #             self.fk_npo[i - 1] + ".sx",
+            #             self.fk_npo[i - 1] + ".sy",
+            #             self.fk_npo[i - 1] + ".sz",
+            #         ],
+            #     )
+            #
+            #     pm.connectAttr(
+            #         div_node + ".output", self.scl_npo[i] + ".scale"
+            #     )
 
             # Controlers
             if i == 0:
-                mulmat_node = applyop.gear_mulmatrix_op(
-                    self.div_cns[i].attr("worldMatrix"),
-                    self.root.attr("worldInverseMatrix"),
-                )
+                par_cns = self.root
+                par_ctl = self.root
+                # mulmat_node = applyop.gear_mulmatrix_op(
+                #     self.div_cns[i].attr("worldMatrix"),
+                #     self.root.attr("worldInverseMatrix"),
+                # )
             else:
-                mulmat_node = applyop.gear_mulmatrix_op(
-                    self.div_cns[i].attr("worldMatrix"),
-                    self.div_cns[i - 1].attr("worldInverseMatrix"),
-                )
+                par_cns = self.div_cns[i - 1]
+                par_ctl = self.fk_ctl[i - 1]
+                # mulmat_node = applyop.gear_mulmatrix_op(
+                #     self.div_cns[i].attr("worldMatrix"),
+                #     self.div_cns[i - 1].attr("worldInverseMatrix"),
+                # )
 
-            dm_node = node.createDecomposeMatrixNode(mulmat_node + ".output")
+            # dm_node = node.createDecomposeMatrixNode(mulmat_node + ".output")
+            # pm.connectAttr(
+            #     dm_node + ".outputTranslate", self.fk_npo[i].attr("t")
+            # )
+            # pm.connectAttr(dm_node + ".outputRotate", self.fk_npo[i].attr("r"))
+            mtx_cns_node = applyop.gear_matrix_cns(self.div_cns[i], self.fk_npo[i])
+            mtx_cns_node.drivenRestMatrix.set(datatypes.Matrix())
             pm.connectAttr(
-                dm_node + ".outputTranslate", self.fk_npo[i].attr("t")
+                par_cns.worldInverseMatrix,
+                mtx_cns_node.drivenParentInverseMatrix,
+                force=True
             )
-            pm.connectAttr(dm_node + ".outputRotate", self.fk_npo[i].attr("r"))
+            inv_scl_node = node.createDivNode(
+                [1, 1, 1],
+                [par_ctl.sx, par_ctl.sy, par_ctl.sz]
+            )
+            pm.connectAttr(inv_scl_node.output, mtx_cns_node.drivenInverseScale)
 
             # Orientation Lock
             if i == self.divisions - 1:
-                dm_node = node.createDecomposeMatrixNode(
-                    self.ik_ctl + ".worldMatrix"
+                fk_t = transform.getTransform(self.div_cns[i])
+                # fk ctrl in ik ctrl space give the offset we need to align them
+                mm_node = node.createMultMatrixNode(
+                    fk_t * ik_t.inverse(), self.ik_ctl + ".worldMatrix"
                 )
+                dm_node = node.createDecomposeMatrixNode(mm_node + ".matrixSum")
                 blend_node = node.createBlendNode(
                     [dm_node + ".outputRotate%s" % s for s in "XYZ"],
                     [cns + ".rotate%s" % s for s in "XYZ"],
@@ -595,10 +693,10 @@ class Component(component.Main):
 
         # scale compensation
         dm_node = node.createDecomposeMatrixNode(
-            self.scl_npo[0] + ".parentInverseMatrix"
+            self.scl_npo + ".parentInverseMatrix"
         )
 
-        pm.connectAttr(dm_node + ".outputScale", self.scl_npo[0] + ".scale")
+        pm.connectAttr(dm_node + ".outputScale", self.scl_npo + ".scale")
 
     # =====================================================
     # CONNECTOR
@@ -607,10 +705,10 @@ class Component(component.Main):
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.root
         self.relatives["tan1"] = self.root
-        self.relatives["tan2"] = self.head_ctl
-        self.relatives["neck"] = self.head_ctl
-        self.relatives["head"] = self.head_ctl
-        self.relatives["eff"] = self.head_ctl
+        self.relatives["tan2"] = self.scl_ref[-1]
+        self.relatives["neck"] = self.scl_ref[-1]
+        self.relatives["head"] = self.scl_ref[-1]
+        self.relatives["eff"] = self.scl_ref[-1]
 
         self.controlRelatives["root"] = self.fk_ctl[0]
         self.controlRelatives["tan1"] = self.head_ctl
