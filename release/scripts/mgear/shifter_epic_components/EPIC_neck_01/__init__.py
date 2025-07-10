@@ -209,16 +209,21 @@ class Component(component.Main):
 
         self.mst_crv.setAttr("visibility", False)
         self.slv_crv.setAttr("visibility", False)
+        pm.xform(self.mst_crv, t=(0, 0, 0), ro=(0, 0, 0), s=(1, 1, 1), sh=(0, 0, 0))
+        pm.xform(self.slv_crv, t=(0, 0, 0), ro=(0, 0, 0), s=(1, 1, 1), sh=(0, 0, 0))
 
         # Division -----------------------------------------
         # The user only define how many intermediate division he wants.
         # First and last divisions are an obligation.
-        parentdiv = self.root
-        # parentctl = self.root
+        parentdiv = primitive.addTransform(
+            self.root,
+            self.getName("div_par"),
+            transform.getTransform(self.root),
+        )
+        parentctl = self.root
         self.div_cns = []
         self.fk_ctl = []
         self.fk_npo = []
-        # self.scl_npo = []
         self.scl_ref = []
 
         self.twister = []
@@ -245,13 +250,6 @@ class Component(component.Main):
             self.root, self.getName("intMRef"), t
         )
 
-        self.scl_npo = primitive.addTransform(
-            self.root,
-            self.getName("scl_npo"),
-            transform.getTransform(self.root),
-        )
-        parentctl = self.scl_npo
-
         self.previousCtlTag = self.parentCtlTag
         for i in range(self.divisions):
 
@@ -260,15 +258,10 @@ class Component(component.Main):
                 parentdiv, self.getName("%s_cns" % i), t
             )
 
-            pm.setAttr(div_cns + ".inheritsTransform", False)
+            # pair with localizing motionpath to fix scaling
+            # pm.setAttr(div_cns + ".inheritsTransform", False)
             self.div_cns.append(div_cns)
-            parentdiv = div_cns
-
-            # scl_npo = primitive.addTransform(
-            #     self.root,
-            #     self.getName("%s_scl_npo" % i),
-            #     transform.getTransform(parentctl),
-            # )
+            # parentdiv = div_cns
 
             # Controlers (First and last one are fake)
             if i == self.divisions - 1:
@@ -330,7 +323,6 @@ class Component(component.Main):
                 )
 
             self.fk_ctl.append(fk_ctl)
-            # self.scl_npo.append(scl_npo)
             self.fk_npo.append(fk_npo)
             parentctl = fk_ctl
 
@@ -577,8 +569,9 @@ class Component(component.Main):
             # References
             u = i / (self.divisions - 1.0)
 
+            # localize motion path, better/simpler scaling
             cns = applyop.pathCns(
-                self.div_cns[i], self.slv_crv, False, u, True
+                self.div_cns[i], self.slv_crv, False, u, True, True
             )
             cns.setAttr("frontAxis", aim_axis.upper()[-1])  # bone axis
             cns.setAttr("inverseFront", "-" in aim_axis)
@@ -593,8 +586,11 @@ class Component(component.Main):
             mm_node = node.createMultMatrixNode(
                 fk_t * ik_t.inverse(), self.ik_ctl + ".worldMatrix"
             )
+            # localize IK ctrl input
+            self.root.wim >> mm_node.i[2]
+            # localize base mtx too
             intMatrix = applyop.gear_intmatrix_op(
-                self.intMRef + ".worldMatrix", mm_node + ".matrixSum", u
+                self.intMRef + ".matrix", mm_node + ".matrixSum", u
             )
             dm_node = node.createDecomposeMatrixNode(intMatrix + ".output")
             pm.connectAttr(
@@ -620,54 +616,26 @@ class Component(component.Main):
             pm.connectAttr(self.sq_att[i], op + ".squash")
             op.setAttr("driver_min", 0.1)
 
-            # scl compas
-            # if i != 0:
-            #     div_node = node.createDivNode(
-            #         [1, 1, 1],
-            #         [
-            #             self.fk_npo[i - 1] + ".sx",
-            #             self.fk_npo[i - 1] + ".sy",
-            #             self.fk_npo[i - 1] + ".sz",
-            #         ],
-            #     )
-            #
-            #     pm.connectAttr(
-            #         div_node + ".output", self.scl_npo[i] + ".scale"
-            #     )
 
             # Controlers
-            if i == 0:
-                par_cns = self.root
-                par_ctl = self.root
-                # mulmat_node = applyop.gear_mulmatrix_op(
-                #     self.div_cns[i].attr("worldMatrix"),
-                #     self.root.attr("worldInverseMatrix"),
-                # )
-            else:
-                par_cns = self.div_cns[i - 1]
-                par_ctl = self.fk_ctl[i - 1]
-                # mulmat_node = applyop.gear_mulmatrix_op(
-                #     self.div_cns[i].attr("worldMatrix"),
-                #     self.div_cns[i - 1].attr("worldInverseMatrix"),
-                # )
-
-            # dm_node = node.createDecomposeMatrixNode(mulmat_node + ".output")
-            # pm.connectAttr(
-            #     dm_node + ".outputTranslate", self.fk_npo[i].attr("t")
-            # )
-            # pm.connectAttr(dm_node + ".outputRotate", self.fk_npo[i].attr("r"))
+            # ik drive fk
             mtx_cns_node = applyop.gear_matrix_cns(self.div_cns[i], self.fk_npo[i])
             mtx_cns_node.drivenRestMatrix.set(datatypes.Matrix())
-            pm.connectAttr(
-                par_cns.worldInverseMatrix,
-                mtx_cns_node.drivenParentInverseMatrix,
-                force=True
-            )
-            inv_scl_node = node.createDivNode(
-                [1, 1, 1],
-                [par_ctl.sx, par_ctl.sy, par_ctl.sz]
-            )
-            pm.connectAttr(inv_scl_node.output, mtx_cns_node.drivenInverseScale)
+            if i == 0:
+                # fk0 doesn't need scale inversion, that is all taken care of at the root
+                pass
+            else:
+                par_ctl = self.fk_ctl[i - 1]
+                inv_scl_node = node.createDivNode(
+                    [1, 1, 1],
+                    [par_ctl.sx, par_ctl.sy, par_ctl.sz]
+                )
+                pm.connectAttr(inv_scl_node.output, mtx_cns_node.drivenInverseScale)
+                pm.connectAttr(
+                    self.div_cns[i - 1].worldInverseMatrix,
+                    mtx_cns_node.drivenParentInverseMatrix,
+                    force=True
+                )
 
             # Orientation Lock
             if i == self.divisions - 1:
@@ -676,6 +644,8 @@ class Component(component.Main):
                 mm_node = node.createMultMatrixNode(
                     fk_t * ik_t.inverse(), self.ik_ctl + ".worldMatrix"
                 )
+                # localize IK ctrl input
+                self.root.wim >> mm_node.i[2]
                 dm_node = node.createDecomposeMatrixNode(mm_node + ".matrixSum")
                 blend_node = node.createBlendNode(
                     [dm_node + ".outputRotate%s" % s for s in "XYZ"],
@@ -688,31 +658,33 @@ class Component(component.Main):
                     blend_node + ".output", self.div_cns[i] + ".rotate"
                 )
 
+            if self.options["force_SSC"]:
+                op.global_scale.disconnect()
+                op.global_scale.set(1, 1, 1)
+
         # Head ---------------------------------------------
         self.fk_ctl[-1].addChild(self.head_cns)
 
-        # scale compensation
-        dm_node = node.createDecomposeMatrixNode(
-            self.scl_npo + ".parentInverseMatrix"
-        )
+        if self.options["force_SSC"]:
+            # do it a little different. want to negate only immediate parent's scale
+            pass
 
-        pm.connectAttr(dm_node + ".outputScale", self.scl_npo + ".scale")
 
     # =====================================================
     # CONNECTOR
     # =====================================================
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
-        self.relatives["root"] = self.root
-        self.relatives["tan1"] = self.root
+        self.relatives["root"] = self.fk_ctl[0]
+        self.relatives["tan1"] = self.fk_ctl[0]
         self.relatives["tan2"] = self.scl_ref[-1]
         self.relatives["neck"] = self.scl_ref[-1]
         self.relatives["head"] = self.scl_ref[-1]
         self.relatives["eff"] = self.scl_ref[-1]
 
         self.controlRelatives["root"] = self.fk_ctl[0]
-        self.controlRelatives["tan1"] = self.head_ctl
-        self.controlRelatives["tan2"] = self.head_ctl
+        self.controlRelatives["tan1"] = self.fk_ctl[0]
+        self.controlRelatives["tan2"] = self.fk_ctl[-1]
         self.controlRelatives["neck"] = self.head_ctl
         self.controlRelatives["head"] = self.head_ctl
         self.controlRelatives["eff"] = self.head_ctl
@@ -735,6 +707,26 @@ class Component(component.Main):
     def connect_standardWithIkRef(self):
 
         self.parent.addChild(self.root)
+        # self.scale_in_root_space.i[0].set(self.root.m.get())
+        # self.scale_in_root_space.i[2].set(self.root.im.get())
+        # self.parent.m >> self.root_ssc_mtx.imat
+        if self.options["force_SSC"]:
+            # finally, something that functions identically to SSC
+            # ssc_mtx_cns = applyop.gear_matrix_cns(self.root.m)
+            ssc_mtx_cns = pm.nt.Mgear_matrixConstraint()
+            # don't want PIM connected, it can all be local
+            ssc_mtx_cns.driverMatrix.set(self.root.m.get())
+            # connect *all*
+            ssc_mtx_cns.translate >> self.root.t
+            ssc_mtx_cns.rotate >> self.root.r
+            ssc_mtx_cns.scale >> self.root.s
+            ssc_mtx_cns.shear >> self.root.sh
+            # inverted parent scale
+            root_scl_inv = pm.nt.MultiplyDivide()
+            root_scl_inv.operation.set(2)
+            root_scl_inv.input1.set(1, 1, 1)
+            self.parent.scale >> root_scl_inv.input2
+            root_scl_inv.o >> ssc_mtx_cns.drivenInverseScale
 
         self.connectRef(self.settings["ikrefarray"], self.ik_cns)
 

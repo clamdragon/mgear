@@ -347,7 +347,11 @@ class Component(component.Main):
 
             if i == 0:  # First
                 inpu = self.roll_att
-                min_input = self.angles_att[i]
+                try:
+                    min_input = self.angles_att[i]
+                except IndexError:
+                    # single div case
+                    min_input = -360
 
             elif i == len(self.angles_att):  # Last
                 sub_nod = node.createSubNode(
@@ -424,15 +428,19 @@ class Component(component.Main):
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
 
-        self.relatives["root"] = self.fk_ctl[0]
-        self.relatives["heel"] = self.fk_ctl[0]
-        self.relatives["inpivot"] = self.fk_ctl[0]
-        self.relatives["outpivot"] = self.fk_ctl[0]
+        if self.fk_ctl:
+            main = self.fk_ctl[0]
+        else:
+            main = self.root
+        self.relatives["root"] = main
+        self.relatives["heel"] = main
+        self.relatives["inpivot"] = main
+        self.relatives["outpivot"] = main
 
-        self.controlRelatives["root"] = self.fk_ctl[0]
-        self.controlRelatives["heel"] = self.fk_ctl[0]
-        self.controlRelatives["inpivot"] = self.fk_ctl[0]
-        self.controlRelatives["outpivot"] = self.fk_ctl[0]
+        self.controlRelatives["root"] = main
+        self.controlRelatives["heel"] = main
+        self.controlRelatives["inpivot"] = main
+        self.controlRelatives["outpivot"] = main
 
         self.jointRelatives["root"] = 0
         self.jointRelatives["heel"] = 0

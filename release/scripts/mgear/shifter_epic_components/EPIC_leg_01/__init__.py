@@ -27,6 +27,11 @@ class Component(component.Main):
         self.blade_normal = self.guide.blades["blade"].z
 
         self.normal = self.getNormalFromPos(self.guide.apos)
+        # normal is assumed to be down negative x... if it's positive, knee is flipped
+        if self.normal.x > 0:
+            self.bend_plane = "x-z"
+        else:
+            self.bend_plane = "xz"
 
         self.length0 = vector.getDistance(
             self.guide.apos[0], self.guide.apos[1]
@@ -73,7 +78,7 @@ class Component(component.Main):
             self.guide.apos[0],
             self.guide.apos[1],
             self.normal,
-            "xz",
+            self.bend_plane,
             self.negate,
         )
         if self.settings["FK_rest_T_Pose"]:
@@ -117,7 +122,7 @@ class Component(component.Main):
             self.guide.apos[1],
             self.guide.apos[2],
             self.normal,
-            "xz",
+            self.bend_plane,
             self.negate,
         )
 
@@ -155,7 +160,7 @@ class Component(component.Main):
                 self.guide.apos[2],
                 self.guide.apos[3],
                 self.blade_normal,
-                "xz",
+                self.bend_plane,
                 self.negate,
             )
         else:
@@ -163,7 +168,7 @@ class Component(component.Main):
                 self.guide.apos[2],
                 self.guide.apos[3],
                 self.normal,
-                "xz",
+                self.bend_plane,
                 self.negate,
             )
 
@@ -328,6 +333,9 @@ class Component(component.Main):
             self.tws_npo, self.getName("tws_ref"), t
         )
 
+        if self.normal.x > 0:
+            self.tws_ref.rx.set(180)
+
         # Mid Controler ------------------------------------
         t = transform.getTransform(self.ctrn_loc)
         self.mid_cns = primitive.addTransform(
@@ -403,6 +411,14 @@ class Component(component.Main):
         )
 
         self.tws2_rot.setAttr("sx", 0.001)
+        # since X is all we really need, make it dominant in the rot order
+        # so it doesn't get "orientation cleanup duty"
+        attribute.setRotOrder(self.tws2_rot, "ZYX")
+        if self.settings["use_blade"]:
+            # works best aligned with calf, not whatever end effector/foot is doing
+            # might be good without blade too? dunno.
+            self.tws2_rot.r.set(0, 0, 0)
+
 
         # Divisions ----------------------------------------
 
@@ -759,6 +775,11 @@ class Component(component.Main):
         )
 
         pm.connectAttr(self.blend_att, o_node + ".blend")
+        # flip for IK correction of backward knees
+        if self.normal.x > 0:
+            self.reverse_att = node.createReverseNode(self.reverse_att).outputX
+            self.roll_att = node.createAddNode(self.roll_att, 180).output
+
         if self.negate:
             mulVal = -1
         else:
@@ -787,7 +808,7 @@ class Component(component.Main):
         pm.scaleConstraint(self.eff_loc, self.tws2_loc, maintainOffset=False)
         applyop.oriCns(self.bone1, self.tws2_loc, maintainOffset=False)
 
-        applyop.oriCns(self.tws_ref, self.tws2_rot)
+        applyop.oriCns(self.tws_ref, self.tws2_rot, maintainOffset=True)
 
         if self.settings["div0"]:
             ori_ref = self.rollRef[0]

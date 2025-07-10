@@ -412,18 +412,20 @@ class Component(component.Main):
 
             self.fk_npo.append(fk_npo)
             parentctl = fk_ctl
-            if i == self.settings["division"] - 1:
-                t = transform.getTransformLookingAt(
-                    self.guide.pos["spineTop"],
-                    self.guide.pos["chest"],
-                    self.normal,
-                    aim_axis + bend_axis,
-                    False,
-                )
-                scl_ref_parent = self.root
-            else:
-                t = transform.getTransform(parentctl)
-                scl_ref_parent = parentctl
+            # what? no.
+            # must be same orientation as parent otherwise the scale messes up.
+            # if i == self.settings["division"] - 1:
+            #     t = transform.getTransformLookingAt(
+            #         self.guide.pos["spineTop"],
+            #         self.guide.pos["chest"],
+            #         self.normal,
+            #         aim_axis + bend_axis,
+            #         False,
+            #     )
+            #     scl_ref_parent = self.root
+            # else:
+            t = transform.getTransform(parentctl)
+            scl_ref_parent = parentctl
 
             scl_ref = primitive.addTransform(
                 scl_ref_parent, self.getName("%s_scl_ref" % i), t
@@ -876,12 +878,15 @@ class Component(component.Main):
         self.relatives["root"] = self.cnx0
         self.relatives["spineTop"] = self.cnx1
         self.relatives["chest"] = self.cnx1
-        self.relatives["tan0"] = self.fk_ctl[1]
+        self.relatives["spineBase"] = self.fk_ctl[0]
+        self.relatives["tan0"] = self.fk_ctl[0]
         self.controlRelatives["root"] = self.fk_ctl[0]
         self.controlRelatives["spineTop"] = self.fk_ctl[-2]
         self.controlRelatives["chest"] = self.fk_ctl[-2]
 
+        # joint indices are 1 off from fk ctrl indices because of pelvis
         self.jointRelatives["root"] = 0
+        self.jointRelatives["spineBase"] = 1
         self.jointRelatives["tan0"] = 1
         self.jointRelatives["spineTop"] = -2
         self.jointRelatives["chest"] = -1
