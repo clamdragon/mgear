@@ -120,7 +120,7 @@ def oriCns(driver, driven, maintainOffset=False):
     return oriCns
 
 
-def pathCns(obj, curve, cnsType=False, u=0, tangent=False):
+def pathCns(obj, curve, cnsType=False, u=0, tangent=False, local=False):
     """
     Apply a path constraint or curve constraint.
 
@@ -132,6 +132,7 @@ def pathCns(obj, curve, cnsType=False, u=0, tangent=False):
         u (float): Position of the object on the curve (from 0 to 100 for path
             constraint, from 0 to 1 for Curve cns).
         tangent (bool): Keep tangent orientation option.
+        local (bool): Whether to connect curve's local or world shape (default)
 
     Returns:
         pyNode: The newly created constraint.
@@ -141,7 +142,10 @@ def pathCns(obj, curve, cnsType=False, u=0, tangent=False):
     node.setAttr("fractionMode", not cnsType)
     node.setAttr("follow", tangent)
 
-    pm.connectAttr(curve.attr("worldSpace"), node.attr("geometryPath"))
+    if local:
+        pm.connectAttr(curve.attr("local"), node.attr("geometryPath"))
+    else:
+        pm.connectAttr(curve.attr("worldSpace"), node.attr("geometryPath"))
     pm.connectAttr(node.attr("allCoordinates"), obj.attr("translate"))
     pm.connectAttr(node.attr("rotate"), obj.attr("rotate"))
     pm.connectAttr(node.attr("rotateOrder"), obj.attr("rotateOrder"))

@@ -715,7 +715,9 @@ def createAddNodeMulti(inputs=[]):
     >>> angle_outputs = nod.createAddNodeMulti(self.angles_att)
 
     """
-    outputs = [inputs[0]]
+    # outputs = [inputs[0]]
+    # supports empty list
+    outputs = inputs[0:1]
 
     for i, input in enumerate(inputs[1:]):
         node_name = pm.createNode("addDoubleLinear")

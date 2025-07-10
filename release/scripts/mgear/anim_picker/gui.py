@@ -44,6 +44,7 @@ from .widgets import overlay_widgets
 
 from .handlers import __EDIT_MODE__
 from .handlers import __SELECTION__
+from .handlers import python_handlers
 from six.moves import range
 
 # constants -------------------------------------------------------------------
@@ -2281,6 +2282,24 @@ class MainDockWindow(QtWidgets.QWidget):
         # Add scene open event
         self.cb_manager.newSceneCB("anim_picker_newScene",
                                    self.selection_change_event)
+
+        self.cb_manager.userTimeChangedCB("anim_picker_time",
+                                          self.time_change_event)
+
+
+    def time_change_event(self, *args):
+        '''
+        Event called when user changes the scene time.
+        Runs through all script items (items with action mode set),
+        and runs that item's script in init mode to refresh attr values in GUI!
+        '''
+        for item in self.get_picker_items():
+            if item.get_custom_action_mode():
+                python_handlers.safe_code_exec(
+                    item.get_custom_action_script(),
+                    env=item.get_init_env()
+                )
+
 
     def selection_change_event(self, *args):
         '''

@@ -123,11 +123,18 @@ def addJoint(parent, name, m=datatypes.Matrix(), vis=True):
         dagNode: The newly created node.
 
     """
+    # tiny (floating-point error level tiny) amounts of scale can mean
+    # that Maya inserts dummy transforms in between joint and parent.
+    # SO, parent relative preserves 0 xforms - set worldspace after parenting
     node = pm.PyNode(pm.createNode("joint", n=name))
-    node.setTransformation(m)
+    # node.setTransformation(m)
     node.setAttr("visibility", vis)
     if parent is not None:
-        parent.addChild(node)
+        # parent.addChild(node)
+        pm.parent(node, parent, relative=True)
+        pm.connectAttr(parent.scale, node.inverseScale)
+
+    node.setMatrix(m, ws=True)
 
     return node
 

@@ -638,7 +638,8 @@ def getComboIndex_with_namespace(namespace, object_name, combo_attr):
     else:
         node = getNode(object_name)
 
-    oVal = node.attr(combo_attr).get()
+    # specify current time so that this can run during timeChanged callbacks!
+    oVal = node.attr(combo_attr).get(time=pm.currentTime(q=True))
     return oVal
 
 
@@ -939,6 +940,7 @@ def ikFkMatch_with_namespace(
     ik_ctrl = _get_node(ik)
     ik_target = _get_mth(ik)
     upv_ctrl = _get_node(upv)
+    upv_target = _get_mth(upv)
 
     if ik_rot:
         ik_rot_node = _get_node(ik_rot)
@@ -1014,29 +1016,32 @@ def ikFkMatch_with_namespace(
         if ik_rot:
             transform.matchWorldTransform(ik_rot_target, ik_rot_node)
 
-        transform.matchWorldTransform(fk_targets[1], upv_ctrl)
-        # calculates new pole vector position
-        start_end = fk_targets[-1].getTranslation(space="world") - fk_targets[
-            0
-        ].getTranslation(space="world")
-        start_mid = fk_targets[1].getTranslation(space="world") - fk_targets[
-            0
-        ].getTranslation(space="world")
+        if upv_target:
+            transform.matchWorldTransform(upv_target, upv_ctrl)
+        else:
+            transform.matchWorldTransform(fk_targets[1], upv_ctrl)
+            # calculates new pole vector position
+            start_end = fk_targets[-1].getTranslation(space="world") - fk_targets[
+                0
+            ].getTranslation(space="world")
+            start_mid = fk_targets[1].getTranslation(space="world") - fk_targets[
+                0
+            ].getTranslation(space="world")
 
-        dot_p = start_mid * start_end
-        proj = float(dot_p) / float(start_end.length())
-        proj_vector = start_end.normal() * proj
-        arrow_vector = start_mid - proj_vector
-        arrow_vector *= start_end.normal().length()
+            dot_p = start_mid * start_end
+            proj = float(dot_p) / float(start_end.length())
+            proj_vector = start_end.normal() * proj
+            arrow_vector = start_mid - proj_vector
+            arrow_vector *= start_end.normal().length()
 
-        # ensure that the pole vector distance is a minimun of 1 unit
-        while arrow_vector.length() < 1.0:
-            arrow_vector *= 2.0
+            # ensure that the pole vector distance is a minimun of 1 unit
+            while arrow_vector.length() < 1.0:
+                arrow_vector *= 2.0
 
-        final_vector = arrow_vector + fk_targets[1].getTranslation(
-            space="world"
-        )
-        upv_ctrl.setTranslation(final_vector, space="world")
+            final_vector = arrow_vector + fk_targets[1].getTranslation(
+                space="world"
+            )
+            upv_ctrl.setTranslation(final_vector, space="world")
 
         # sets blend attribute new value
         o_attr.set(1.0)
