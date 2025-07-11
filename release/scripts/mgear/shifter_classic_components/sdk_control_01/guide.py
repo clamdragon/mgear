@@ -1,7 +1,7 @@
 """Guide Control 01 module"""
 
 from functools import partial
-import pymel.core as pm
+import mgear.pymaya as pm
 
 from mgear.shifter.component import guide
 from mgear.core import transform, pyqt, attribute
@@ -15,7 +15,7 @@ from . import settingsUI as sui
 
 # guide info
 AUTHOR = "Jeremie Passerin, Miquel Campos, Justin Pedersen"
-URL = "www.jeremiepasserin.com, www.miquel-campos.com, justin@tcgcape.co.za"
+URL = ", www.mcsgear.com, justin@tcgcape.co.za"
 EMAIL = ""
 VERSION = [1, 0, 0]
 TYPE = "sdk_control_01"
@@ -138,7 +138,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                           'sphere',
                           'square']
 
-        super(self.__class__, self).__init__(parent=parent)
+        super(componentSettings, self).__init__(parent=parent)
         self.settingsTab = settingsTab()
 
         self.setup_componentSettingWindow()

@@ -4,7 +4,7 @@ import json
 from functools import partial
 
 import mgear.core.pyqt as gqt
-import pymel.core as pm
+import mgear.pymaya as pm
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from mgear.vendor.Qt import QtCore, QtWidgets
 
@@ -104,6 +104,22 @@ class ui(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.everyNVertex.setRange(0, 100)
         self.everyNVertex.setSingleStep(1)
         self.everyNVertex.setValue(1)
+
+        self.fixedJoints = QtWidgets.QCheckBox("Set Fixed Number of Joints")
+        self.fixedJoints.setChecked(False)
+
+        # self.fixedJointsNumber_label = QtWidgets.QLabel(
+        #     "Number of Joints:"
+        # )
+        self.fixedJointsNumber = QtWidgets.QSpinBox()
+        self.fixedJointsNumber.setRange(1, 100)
+        self.fixedJointsNumber.setSingleStep(1)
+        self.fixedJointsNumber.setValue(3)
+
+        self.orderFromCenter = QtWidgets.QCheckBox(
+            "Right side Joints order starts from center"
+        )
+        self.orderFromCenter.setChecked(False)
 
         # Topological Autoskin
         self.topoSkin_group = QtWidgets.QGroupBox("Skin")
@@ -212,10 +228,16 @@ class ui(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         everyNVertex_layout.addWidget(self.everyNVertex_label)
         everyNVertex_layout.addWidget(self.everyNVertex)
 
+        fixedJoints_layout = QtWidgets.QHBoxLayout()
+        fixedJoints_layout.addWidget(self.fixedJoints)
+        fixedJoints_layout.addWidget(self.fixedJointsNumber)
+
         joints_layout = QtWidgets.QVBoxLayout()
         joints_layout.setContentsMargins(6, 4, 6, 4)
         joints_layout.addLayout(headJnt_layout)
         joints_layout.addLayout(everyNVertex_layout)
+        joints_layout.addLayout(fixedJoints_layout)
+        joints_layout.addWidget(self.orderFromCenter)
         self.joints_group.setLayout(joints_layout)
 
         # topological autoskin Layout

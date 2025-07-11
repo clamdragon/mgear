@@ -9,8 +9,8 @@ from maya.app.general.mayaMixin import MayaQDockWidget
 
 # guide info
 AUTHOR = "Jeremie Passerin, Miquel Campos"
-URL = "www.jeremiepasserin.com, www.miquletd.com"
-EMAIL = "geerem@hotmail.com, hello@miquel-campos.com"
+URL = ", www.miquletd.com"
+EMAIL = ", "
 VERSION = [1, 0, 0]
 TYPE = "mouth_01"
 NAME = "mouth"
@@ -86,7 +86,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
 
-        super(self.__class__, self).__init__(parent=parent)
+        super(componentSettings, self).__init__(parent=parent)
 
         self.setup_componentSettingWindow()
         self.create_componentControls()

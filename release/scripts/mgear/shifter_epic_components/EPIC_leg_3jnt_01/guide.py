@@ -1,8 +1,8 @@
 """Guide leg 3jnt 01 module"""
 
 from functools import partial
+import mgear.pymaya as pm
 
-import pymel.core as pm
 from mgear.shifter.component import guide
 from mgear.core import transform, pyqt, attribute
 from mgear.vendor.Qt import QtWidgets, QtCore
@@ -55,7 +55,7 @@ class Guide(guide.ComponentGuide):
 
     def addObjects(self):
         """Add the Guide Root, blade and locators"""
-        # lockAttrs = ["tx", "ry", "rz"]
+        # if x-bone, z bend is how the controls are oriented, why not the guides too?
         lockAttrs = ["tz", "rx", "ry"]
         self.root = self.addRoot()
         vTemp = transform.getOffsetPosition(self.root, [3, 1, 0])
@@ -95,9 +95,9 @@ class Guide(guide.ComponentGuide):
         self.pUseBlade = self.addParam("use_blade", "bool", False)
 
         # Divisions
-        self.pDiv0 = self.addParam("div0", "long", 2, 1, None)
-        self.pDiv1 = self.addParam("div1", "long", 2, 1, None)
-        self.pDiv1 = self.addParam("div2", "long", 2, 1, None)
+        self.pDiv0 = self.addParam("div0", "long", 2, 0, None)
+        self.pDiv1 = self.addParam("div1", "long", 2, 0, None)
+        self.pDiv1 = self.addParam("div2", "long", 2, 0, None)
 
         # FCurves
         self.pSt_profile = self.addFCurveParam(
@@ -131,6 +131,7 @@ class Guide(guide.ComponentGuide):
         for shp in self.blade.getShapes():
             pm.connectAttr(self.root.use_blade, shp.attr("visibility"))
 
+
 ##########################################################
 # Setting Page
 ##########################################################
@@ -152,7 +153,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
 
-        super(self.__class__, self).__init__(parent=parent)
+        super(componentSettings, self).__init__(parent=parent)
         self.settingsTab = settingsTab()
 
         self.setup_componentSettingWindow()

@@ -11,7 +11,7 @@ from . import settingsUI as sui
 
 # guide info
 AUTHOR = "Jeremie Passerin, Miquel Campos"
-URL = "www.jeremiepasserin.com, www.miquel-campos.com"
+URL = ", www.mcsgear.com"
 EMAIL = ""
 VERSION = [1, 0, 0]
 TYPE = "EPIC_neck_01"
@@ -148,7 +148,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
 
-        super(self.__class__, self).__init__(parent=parent)
+        super(componentSettings, self).__init__(parent=parent)
         self.settingsTab = settingsTab()
 
         self.setup_componentSettingWindow()

@@ -20,12 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Author:     Jeremie Passerin      geerem@hotmail.com  www.jeremiepasserin.com
-# Author:     Miquel Campos         hello@miquel-campos.com  www.miquel-campos.com
+# Author:     Jeremie Passerin
+# Author:     Miquel Campos           www.mcsgear.com
 # Date:       2016 / 10 / 10
 
 import mgear.core.pyqt as gqt
-from mgear.vendor.Qt import QtCore, QtWidgets
+QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 class Ui_Form(object):
     def setupUi(self, Form):

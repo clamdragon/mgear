@@ -5,9 +5,10 @@
 #############################################
 import collections
 import mgear
-import pymel.core as pm
+import mgear.pymaya as pm
 import maya.cmds as cmds
-import pymel.core.datatypes as datatypes
+import mgear.pymaya.datatypes as datatypes
+from maya.api import OpenMaya
 from .six import string_types
 
 #############################################
@@ -323,7 +324,9 @@ def addProxyAttribute(sourceAttrs, targets, duplicatedPolicy=None):
                 )
 
 
-def moveChannel(attr, sourceNode, targetNode, duplicatedPolicy=None):
+def moveChannel(
+    attr, sourceNode, targetNode, duplicatedPolicy=None, forceFullName=False
+):
     """Move channels  keeping the output connections.
     Duplicated channel policy, stablish the rule in case the channel already
     exist on the target.
@@ -366,7 +369,7 @@ def moveChannel(attr, sourceNode, targetNode, duplicatedPolicy=None):
         )
         return
     atType = at.type()
-    if atType in ["double", "float", "enum"]:
+    if atType in ["double", "float", "enum", "bool"]:
 
         newAtt = None
         attrName = attr
@@ -396,6 +399,10 @@ def moveChannel(attr, sourceNode, targetNode, duplicatedPolicy=None):
                         "the target."
                     )
                     return False
+
+        if forceFullName:
+            attrName = "{}_{}".format(sourceNode.name(), attr)
+            nName = "{}_{}".format(sourceNode.name(), nName)
 
         outcnx = at.listConnections(p=True)
         if not newAtt:
@@ -440,6 +447,15 @@ def moveChannel(attr, sourceNode, targetNode, duplicatedPolicy=None):
                     dv=value,
                     k=True,
                 )
+            elif atType == "bool":
+                pm.addAttr(
+                    targetNode,
+                    longName=attrName,
+                    niceName=nName,
+                    attributeType="bool",
+                    defaultValue=value,
+                    keyable=True,
+                )
 
             newAtt = pm.PyNode(".".join([targetNode.name(), attrName]))
         else:
@@ -448,6 +464,7 @@ def moveChannel(attr, sourceNode, targetNode, duplicatedPolicy=None):
         for cnx in outcnx:
             try:
                 pm.connectAttr(newAtt, cnx, f=True)
+                return newAtt
             except RuntimeError:
                 pm.displayError(
                     "There is a problem connecting the "
@@ -592,6 +609,21 @@ def setNotKeyableAttributes(
             node.setAttr(attr_name, lock=False, keyable=False, cb=True)
 
 
+def _to_rot_od(ordstr):
+    if ordstr == "XYZ":
+        return OpenMaya.MEulerRotation.kXYZ
+    if ordstr == "YZX":
+        return OpenMaya.MEulerRotation.kYZX
+    elif ordstr == "ZXY":
+        return OpenMaya.MEulerRotation.kZXY
+    elif ordstr == "XZY":
+        return OpenMaya.MEulerRotation.kXZY
+    elif ordstr == "YXZ":
+        return OpenMaya.MEulerRotation.kYXZ
+    elif ordstr == "ZYX":
+        return OpenMaya.MEulerRotation.kZYX
+
+
 def setRotOrder(node, s="XYZ"):
     """Set the rotorder of the object.
 
@@ -613,16 +645,30 @@ def setRotOrder(node, s="XYZ"):
 
     er = datatypes.EulerRotation(
         [
-            pm.getAttr(node + ".rx"),
-            pm.getAttr(node + ".ry"),
-            pm.getAttr(node + ".rz"),
+            OpenMaya.MAngle(
+                pm.getAttr(node + ".rx"), OpenMaya.MAngle.kDegrees
+            ).asRadians(),
+            OpenMaya.MAngle(
+                pm.getAttr(node + ".ry"), OpenMaya.MAngle.kDegrees
+            ).asRadians(),
+            OpenMaya.MAngle(
+                pm.getAttr(node + ".rz"), OpenMaya.MAngle.kDegrees
+            ).asRadians(),
         ],
-        unit="degrees",
+        _to_rot_od(a[node.getAttr("ro")]),
     )
-    er.reorderIt(s)
+    er.reorderIt(_to_rot_od(s))
+
+    if node.hasAttr("rotate_order"):
+        change_default_value(node.rotate_order, a.index(s))
 
     node.setAttr("ro", a.index(s))
-    node.setAttr("rotate", er.x, er.y, er.z)
+    node.setAttr(
+        "rotate",
+        OpenMaya.MAngle(er.x).asDegrees(),
+        OpenMaya.MAngle(er.y).asDegrees(),
+        OpenMaya.MAngle(er.z).asDegrees(),
+    )
 
 
 def setInvertMirror(node, invList=None):
@@ -630,6 +676,10 @@ def setInvertMirror(node, invList=None):
 
     Arguments:
         node (dagNode): The object to set invert mirror Values
+        invList (list, optional): list of axis to invert ["tx", "tz"]
+
+    i.e: attribute.setInvertMirror(ctl_pyNode, invList=["tx", "tz"] )
+
 
     """
 
@@ -1005,6 +1055,8 @@ class colorParamDef(ParamDef):
     def get_as_dict(self):
 
         self.param_dict["scriptName"] = self.scriptName
+        if isinstance(self.value, OpenMaya.MVector):
+            self.value = [self.value.x, self.value.y, self.value.z]
         self.param_dict["value"] = self.value
 
         return self.param_dict
@@ -1088,13 +1140,34 @@ def set_default_value(node, attribute):
         node (str, PyNode): The object with the attribute to reset
         attribute (str): The attribute to reset
     """
-    if not isinstance(node, pm.PyNode):
+    if isinstance(node, string_types):
         node = pm.PyNode(node)
 
     defVal = get_default_value(node, attribute)
     try:
-        node.attr(attribute).set(defVal)
-    except RuntimeError:
+        if attribute in ["ro", "rotateOrder"]:
+            # custom metadata rot order attr
+            rotOrder = "rotate_order"
+            if pm.attributeQuery(rotOrder, node=node, exists=True):
+                # print(
+                #     "Resetting rotate Order for {} using custom metadata".format(
+                #         node
+                #     )
+                # )
+                intNum = pm.getAttr("{}.{}".format(node, rotOrder))
+                if not pm.getAttr("{}.rotateOrder".format(node), lock=True):
+                    pm.setAttr("{}.rotateOrder".format(node), intNum)
+            else:
+                pm.displayInfo(
+                    "No custom rotate order metadata found in {}. XYZ rotate order NOT reset".format(
+                        node
+                    )
+                )
+                # node.attr(attribute).set(defVal)
+        else:
+            node.attr(attribute).set(defVal)
+    except (RuntimeError, pm.MayaAttributeError):
+        # print("Failed to reset: {}".format(attribute))
         pass
 
 
@@ -1131,7 +1204,19 @@ def reset_selected_channels_value(objects=None, attributes=None):
 
 def reset_SRT(
     objects=None,
-    attributes=["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "v"],
+    attributes=[
+        "tx",
+        "ty",
+        "tz",
+        "rx",
+        "ry",
+        "rz",
+        "sx",
+        "sy",
+        "sz",
+        "v",
+        "ro",
+    ],
 ):
     """Reset Scale Rotation and translation attributes to default value
 
@@ -1259,14 +1344,14 @@ def getSelectedChannels(userDefine=False):
 
     """
     # fetch core's main channelbox
-    attrs = pm.channelBox(get_channelBox(), q=True, sma=True)
+    attrs = pm.channelBox(get_channelBox(), q=True, sma=True) or []
     if userDefine:
         oSel = pm.selected()[0]
         uda = oSel.listAttr(ud=True)
         if attrs:
             attrs = [x for x in attrs if oSel.attr(x) in uda]
         else:
-            return None
+            return []
 
     return attrs
 
@@ -1293,6 +1378,118 @@ def getSelectedObjectChannels(oSel=None, userDefine=False, animatable=False):
     ]
 
     return channels
+
+
+def has_in_connections(
+    node,
+    attributes=[
+        "translate",
+        "tx",
+        "ty",
+        "tz",
+        "rotate",
+        "rx",
+        "ry",
+        "rz",
+        "scale",
+        "sx",
+        "sy",
+        "sz",
+    ],
+):
+    """
+    Checks if the provided node has any input connections on the specified attributes.
+
+    Args:
+        node (PyNode): The PyNode object for which to check connections.
+        attributes (list, optional): A list of attributes to check for connections.
+                    Defaults to checking all translation,
+        rotation, and scale attributes in all directions.
+
+    Returns:
+        bool: True if any connections are found, False otherwise.
+
+    Examples:
+        >>> jnt = pm.PyNode('myJoint')
+        >>> has_connections(jnt)
+        Found some connections.
+        >>> has_connections(jnt, ['visibility'])
+        No connections found.
+    """
+
+    for attr in attributes:
+        if node.attr(attr).listConnections(d=False):
+            return True
+    return False
+
+
+def disconnect_inputs(
+    node,
+    attributes=[
+        "scale",
+        "sx",
+        "sy",
+        "sz",
+        "translate",
+        "tx",
+        "ty",
+        "tz",
+        "rotate",
+        "rx",
+        "ry",
+        "rz",
+    ],
+):
+    """
+    Disconnects only the input connections of the specified attributes of
+    the provided node.
+
+    Args:
+        node (PyNode): The PyNode object for which to disconnect input
+        connections.
+        attributes (list, optional): A list of attributes to disconnect
+        input connections from. Defaults to disconnecting all translation,
+        rotation, and scale attributes in all directions.
+    """
+    for attr in attributes:
+        connections = node.attr(attr).listConnections(d=False, plugs=True)
+        for conn in connections:
+            pm.disconnectAttr(conn, node.attr(attr))
+
+
+def disconnect_outputs(
+    node,
+    attributes=[
+        "scale",
+        "sx",
+        "sy",
+        "sz",
+        "translate",
+        "tx",
+        "ty",
+        "tz",
+        "rotate",
+        "rx",
+        "ry",
+        "rz",
+    ],
+):
+    """
+    Disconnects only the output connections of the specified attributes of
+    the provided node.
+
+    Args:
+        node (PyNode): The PyNode object for which to disconnect output
+        connections.
+        attributes (list, optional): A list of attributes to disconnect
+        output connections from. Defaults to disconnecting all translation,
+        rotation, and scale attributes in all directions.
+    """
+
+    for attr in attributes:
+        connections = node.attr(attr).listConnections(plugs=True)
+        for conn in connections:
+            pm.disconnectAttr(node.attr(attr), conn)
 
 
 ##########################################################
@@ -1348,6 +1545,131 @@ def get_next_available_index(attr):
         for e in range(ne):
             if not attr.attr(attr.elements()[e]).listConnections():
                 return e
+
+
+def find_next_available_index(node, attribute):
+    """Find the next available index for a multi-attribute on a given node.
+    This function ins similar to get_next_available_index but with 2 args
+
+    Args:
+        node (PyNode): Node with multi-attribute.
+        attribute (str): Multi-attribute name.
+
+    Returns:
+        int: Next available index.
+    """
+    idx = 0
+    while node.attr(attribute)[idx].isConnected():
+        idx += 1
+    return idx
+
+
+def connect_message(source, attr):
+    """
+    Connects the 'message' attribute of one or more source nodes to a
+    destination attribute.
+
+    Args:
+        source (str, pm.PyNode, list): The source node(s) with a 'message'
+                                       attribute.
+        attr (str, pm.PyNode): The destination attribute to connect to.
+
+    Raises:
+        TypeError: If the destination attribute is not a message attribute.
+    """
+    if not isinstance(source, list):
+        source = [source]
+
+    for src in source:
+        idx = get_next_available_index(attr)
+        attr_name = "{}[{}]".format(attr, idx)
+
+        src_str = src if isinstance(src, str) else str(src)
+        attr_str = attr if isinstance(attr, str) else str(attr)
+
+        source_attr_type = pm.attributeQuery(
+            "message", node=src_str.split(".")[0], attributeType=True
+        )
+        dest_attr_type = pm.attributeQuery(
+            attr_str.split("[")[0].split(".")[-1],
+            node=attr_str.split(".")[0],
+            attributeType=True,
+        )
+
+        if source_attr_type != "message":
+            raise TypeError("Source attribute is not a message attribute.")
+
+        if dest_attr_type != "message":
+            raise TypeError(
+                "Destination attribute is not a message attribute."
+            )
+
+        pm.connectAttr("{}.message".format(src_str), attr_name)
+
+
+def resolve_alias_attr(full_attr_name):
+    """
+    Resolves the real name of an attribute if it is an alias.
+
+    Args:
+        full_attr_name (str): The fully qualified alias attribute name (e.g., "blendShape1.pCube1").
+
+    Returns:
+        str: The real attribute name if it's an alias, or the original name if not.
+    """
+    # Split the full attribute into node and alias attribute
+    if "." not in full_attr_name:
+        raise ValueError(
+            "Input must be a fully qualified attribute (e.g., 'node.attr')"
+        )
+
+    node, alias_attr = full_attr_name.split(".", 1)
+
+    # Get all aliases for the node
+    aliases = cmds.aliasAttr(node, query=True) or []
+
+    # aliases is a flat list: [alias1, realAttr1, alias2, realAttr2, ...]
+    alias_dict = dict(zip(aliases[::2], aliases[1::2]))
+
+    # Check if the alias_attr is in the alias list
+    if alias_attr in alias_dict:
+        real_attr = "{}.{}".format(node, alias_dict[alias_attr])
+        return real_attr  # Return the fully qualified real attribute name
+    else:
+        return full_attr_name  # Not an alias, return as is
+
+
+def get_alias_for_attr(full_attr_name):
+    """
+    Gets the alias name for a real attribute, if it exists.
+
+    Args:
+        full_attr_name (str): The fully qualified real attribute name
+            (e.g., "blendShape1.weight[0]").
+
+    Returns:
+        str: The alias name if it exists, or the original name if no alias exists.
+    """
+    # Split the full attribute into node and real attribute
+    if "." not in full_attr_name:
+        raise ValueError(
+            "Input must be a fully qualified attribute (e.g., 'node.attr')"
+        )
+
+    node, real_attr = full_attr_name.split(".", 1)
+
+    # Get all aliases for the node
+    aliases = cmds.aliasAttr(node, query=True) or []
+
+    # aliases is a flat list: [alias1, realAttr1, alias2, realAttr2, ...]
+    alias_dict = dict(zip(aliases[1::2], aliases[::2]))  # Reverse mapping
+
+    # Check if the real_attr is in the alias dictionary
+    if real_attr in alias_dict:
+        alias_attr = "{}.{}".format(node, alias_dict[real_attr])
+        return alias_attr  # Return the fully qualified alias name
+    else:
+        return full_attr_name  # No alias exists, return as is
 
 
 ##########################################################

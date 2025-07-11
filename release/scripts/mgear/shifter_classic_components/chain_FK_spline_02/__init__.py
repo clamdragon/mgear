@@ -1,7 +1,7 @@
 """Component chain FK spline 01 module"""
 
-import pymel.core as pm
-from pymel.core import datatypes
+import mgear.pymaya as pm
+from mgear.pymaya import datatypes
 
 from mgear.shifter import component
 
@@ -228,9 +228,22 @@ class Component(component.Main):
 
                 tagP = tweak_ctl
                 self.extratweak_ctl.append(tweak_ctl)
-                self.jnt_pos.append([tweak_ctl, i, None, False])
+                self.jnt_pos.append(
+                    {
+                        "obj": tweak_ctl,
+                        "name": i,
+                        "UniScale": False,
+                        "leaf_joint": self.settings["leafJoints"],
+                    }
+                )
             else:
-                self.jnt_pos.append([div_cns, i])
+                self.jnt_pos.append(
+                    {
+                        "obj": div_cns,
+                        "name": i,
+                        "leaf_joint": self.settings["leafJoints"],
+                    }
+                )
 
     # =====================================================
     # ATTRIBUTES

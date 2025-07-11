@@ -6,12 +6,14 @@
 # GLOBAL
 #############################################
 from functools import wraps
-import pymel.core as pm
-from pymel.core import datatypes
+import mgear.pymaya as pm
+import maya.cmds as cmds
+from mgear.pymaya import datatypes
 import json
 import maya.mel as mel
 
 import maya.OpenMaya as om
+import maya.api.OpenMaya as om2
 
 from mgear.core import applyop
 from mgear.core import utils
@@ -55,28 +57,43 @@ def addCnsCurve(parent, name, centers, degree=1):
 
 
 def addCurve(
-    parent, name, points, close=False, degree=3, m=datatypes.Matrix()
+    parent, name, points, close=False, degree=3, m=datatypes.Matrix(), op=False
 ):
     """Create a NurbsCurve with a single subcurve.
 
     Arguments:
         parent (dagNode): Parent object.
         name (str): Name
-        positions (list of float): points of the curve in a one dimension array
+        points (list of float): points of the curve in a one dimension array
             [point0X, point0Y, point0Z, 1, point1X, point1Y, point1Z, 1, ...].
         close (bool): True to close the curve.
         degree (bool): 1 for linear curve, 3 for Cubic.
         m (matrix): Global transform.
+        op (bool, optional): If True will add a curve that pass over the points
+                            This is equivalent of using"editPoint " flag
 
-    Returns:
+    No Longer Returned:
         dagNode: The newly created curve.
     """
+    # Check and convert only if the item is an MPoint
+    points = [
+        [point.x, point.y, point.z] if isinstance(point, om2.MPoint) else point
+        for point in points
+    ]
+
+    kwargs = {"name": name, "d": degree}
     if close:
         points.extend(points[:degree])
         knots = range(len(points) + degree - 1)
-        node = pm.curve(n=name, d=degree, p=points, per=close, k=knots)
+        # node = pm.curve(n=name, d=degree, p=points, per=close, k=knots)
+        kwargs["per"] = close
+        kwargs["k"] = knots
+    if op:
+        # kwargs["ep"] = points
+        kwargs["ep"] = [datatypes.Vector(p) for p in points]
     else:
-        node = pm.curve(n=name, d=degree, p=points)
+        kwargs["p"] = points
+    node = pm.curve(**kwargs)
 
     if m is not None:
         node.setTransformation(m)
@@ -157,8 +174,12 @@ def createCuveFromEdges(
         axis = 1
     else:
         axis = 2
-
-    vList = pm.polyListComponentConversion(edgeList, fe=True, tv=True)
+    # conver MesEdge object to str
+    string_edge_list = [
+        str(edge) if not isinstance(edge, str) else edge for edge in edgeList
+    ]
+    vList = cmds.polyListComponentConversion(string_edge_list, fe=True, tv=True)
+    vList = cmds.ls(vList, flatten=True)
 
     centers = []
     centersOrdered = []
@@ -179,6 +200,90 @@ def createCuveFromEdges(
     return crv
 
 
+def get_uniform_world_positions_on_curve(curve, num_positions):
+    """
+    Get a specified number of uniformly distributed world positions along a
+    NURBS curve.
+
+    Args:
+        curve (str or PyNode): The name or PyNode of the NURBS curve.
+        num_positions (int): The number of uniformly distributed positions
+            to return.
+
+    Returns:
+        tuple: A list of tuples, where each tuple represents a world
+            position (x, y, z).
+    """
+    # Get the MDagPath of the curve
+    sel_list = om.MSelectionList()
+    sel_list.add(curve)
+    curve_dag_path = om.MDagPath()
+    sel_list.getDagPath(0, curve_dag_path)
+
+    # Create an MFnNurbsCurve function set to work with the curve
+    curve_fn = om.MFnNurbsCurve(curve_dag_path)
+
+    # Calculate the arc length of the curve
+    arc_length = curve_fn.length()
+
+    # Calculate the interval length between positions
+    interval_length = arc_length / float(num_positions - 1)
+
+    positions = []
+
+    # Loop through the number of positions to calculate U parameter and world
+    # position
+    for i in range(num_positions):
+        # Calculate the desired length for the current position
+        desired_length = interval_length * i
+
+        # Get the corresponding U parameter for the desired length
+        u_param = curve_fn.findParamFromLength(desired_length)
+
+        # Create a point in 3D space to store the world position
+        world_pos = om.MPoint()
+
+        # Get the world position at the given U parameter
+        curve_fn.getPointAtParam(u_param, world_pos, om.MSpace.kWorld)
+
+        # Append the world position as a tuple (x, y, z) to the positions list
+        positions.append(
+            datatypes.Point(world_pos.x, world_pos.y, world_pos.z)
+        )
+
+    # Return the positions as a tuple of tuples
+    return positions
+
+
+def getParamPositionsOnCurve(srcCrv, nbPoints):
+    """get param position on curve
+
+    Arguments:
+        srcCrv (curve): The source curve.
+        nbPoints (int): Number of points to return.
+
+    Returns:
+        tuple: world positions.
+    """
+    if isinstance(srcCrv, str) or isinstance(srcCrv, str):
+        srcCrv = pm.PyNode(srcCrv)
+    length = srcCrv.length()
+    parL = srcCrv.findParamFromLength(length)
+    param = []
+    increment = parL / (nbPoints - 1)
+    p = 0.0
+    for x in range(nbPoints):
+        # we need to check that the param value never exceed the parL
+        if p > parL:
+            p = parL
+        pos = srcCrv.getPointAtParam(p, space="world")
+
+        param.append(pos)
+        p += increment
+
+    return param
+
+
 def createCurveFromCurve(srcCrv, name, nbPoints, parent=None):
     """Create a curve from a curve
 
@@ -191,20 +296,8 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None):
     Returns:
         dagNode: The newly created curve.
     """
-    if isinstance(srcCrv, str) or isinstance(srcCrv, string_types):
-        srcCrv = pm.PyNode(srcCrv)
-    length = srcCrv.length()
-    parL = srcCrv.findParamFromLength(length)
-    param = []
-    increment = parL / (nbPoints - 1)
-    p = 0.0
-    for x in range(nbPoints):
-        # we need to check that the param value never exceed the parL
-        if p > parL:
-            p = parL
-        pos = srcCrv.getPointAtParam(p, space="world")
-        param.append(pos)
-        p += increment
+    param = getParamPositionsOnCurve(srcCrv, nbPoints)
+
     crv = addCurve(parent, name, param, close=False, degree=3)
     return crv
 
@@ -288,6 +381,7 @@ def get_color(node):
     if shp:
         if shp.overrideRGBColors.get():
             color = shp.overrideColorRGB.get()
+            color = [color.x, color.y, color.z]
         else:
             color = shp.overrideColor.get()
 
@@ -795,7 +889,7 @@ def keep_point_0_cnx_state(func):
 def lock_length(crv, lock=True):
     crv_shape = crv.getShape()
     if not crv_shape.hasAttr("lockLength"):
-        crv_shape.addAttr("lockLength", at=bool)
+        crv_shape.addAttr("lockLength", at="bool")
     crv_shape.lockLength.set(lock)
     return crv_shape.lockLength
 
@@ -947,3 +1041,166 @@ def lock_first_point(crv):
     pm.connectAttr(crv.worldInverseMatrix[0], mul_mtrx.matrixIn[1])
     pm.connectAttr(mul_mtrx.matrixSum, dm_node.inputMatrix)
     pm.connectAttr(dm_node.outputTranslate, crv.getShape().controlPoints[0])
+
+
+# ========================================
+
+
+def evaluate_cubic_nurbs(control_points, percentage, knots=None, weights=None):
+    """
+    Evaluate a cubic NURBS curve at a given percentage.
+
+    Args:
+        control_points (list): List of control points, each as [x, y, z].
+        percentage (float): Curve position as a percentage (0 to 100).
+        knots (list, optional): Knot vector.
+        weights (list, optional): List of weights corresponding to control
+                                  points.
+
+    Returns:
+        list: Evaluated point as [x, y, z].
+    """
+    n = len(control_points) - 1
+    p = 3  # Degree for cubic curve
+    d = len(control_points[0])  # Dimension of each point
+
+    if knots is None:
+        knots = (
+            [0] * (p + 1)
+            + [i for i in range(1, n - p + 2)]
+            + [n - p + 2] * (p + 1)
+        )
+
+    if weights is None:
+        weights = [1.0] * (n + 1)
+
+    # Normalize the u parameter to fit within the knot vector range
+    u = knots[p] + (knots[-(p + 1)] - knots[p]) * (percentage / 100.0)
+
+    # Slightly reduce u if percentage is 100 to avoid division by zero
+    if percentage == 100:
+        u -= 1e-5
+
+    C = [0.0 for _ in range(d)]
+    W = 0.0
+
+    for i in range(n + 1):
+        N = cox_de_boor(u, i, p, knots)
+        for j in range(d):
+            C[j] += N * weights[i] * control_points[i][j]
+        W += N * weights[i]
+
+    for j in range(d):
+        C[j] /= W
+
+    return C
+
+
+def cox_de_boor(u, i, p, knots):
+    """
+    Cox-De Boor algorithm to evaluate B-Spline basis function.
+
+    Args:
+        u (float): Parameter value.
+        i (int): Index of control point.
+        p (int): Degree of the curve.
+        knots (list): Knot vector.
+
+    Returns:
+        float: Evaluated B-Spline basis function value.
+    """
+    if p == 0:
+        return 1.0 if knots[i] <= u < knots[i + 1] else 0.0
+
+    N1 = 0
+    if knots[i] != knots[i + p]:
+        N1 = ((u - knots[i]) / (knots[i + p] - knots[i])) * cox_de_boor(
+            u, i, p - 1, knots
+        )
+
+    N2 = 0
+    if knots[i + 1] != knots[i + p + 1]:
+        N2 = (
+            (knots[i + p + 1] - u) / (knots[i + p + 1] - knots[i + 1])
+        ) * cox_de_boor(u, i + 1, p - 1, knots)
+
+    return N1 + N2
+
+
+def create_locator_at_curve_point(object_names, percentage):
+    """
+    Create a locator at a point on a cubic NURBS curve in Maya.
+
+    Args:
+        object_names (list): The names of the objects representing control
+                             points in Maya.
+        percentage (float): Curve position as a percentage (0 to 100).
+
+    Example usage in Maya
+    Select objects representing control points in Maya before running the script
+
+            object_names = cmds.ls(selection=True)
+            create_locator_at_curve_point(object_names, 100)
+    """
+    control_points = []
+    for obj_name in object_names:
+        pos = cmds.xform(
+            obj_name, query=True, translation=True, worldSpace=True
+        )
+        control_points.append(pos)
+
+    point_on_curve = evaluate_cubic_nurbs(control_points, percentage)
+
+    locator_name = cmds.spaceLocator()[0]
+    cmds.setAttr(locator_name + ".translateX", point_on_curve[0])
+    cmds.setAttr(locator_name + ".translateY", point_on_curve[1])
+    cmds.setAttr(locator_name + ".translateZ", point_on_curve[2])
+
+
+def add_linear_skinning_to_curve(curve_name, joint_list):
+    """
+    Adds a skinCluster to a curve and sets the skinning weights linearly
+    among the list of joints based on the number of control points.
+
+    Args:
+        curve_name (str): The name of the curve to add the skinCluster to.
+        joint_list (list): A list of joint names to be included in the skinCluster.
+
+    Returns:
+        PyNode: The name of the created skinCluster.
+    """
+    # Ensure the curve and joints exist
+    if not pm.objExists(curve_name) or not all(
+        pm.objExists(j) for j in joint_list
+    ):
+        raise RuntimeError("Curve or joints do not exist.")
+
+    # Create skinCluster
+    skin_cluster = pm.skinCluster(joint_list, curve_name, tsb=True)
+
+    # Find the number of control points in the curve
+    curve_shape = pm.listRelatives(curve_name, shapes=True)[0]
+    num_cvs = len(curve_shape.getCVs())
+
+    num_joints = len(joint_list)
+
+    # Calculate the weight distribution
+    for i in range(num_cvs):
+        for j in range(num_joints):
+            lower_bound = float(j) / (num_joints - 1)
+            upper_bound = float(j + 1) / (num_joints - 1)
+
+            normalized_i = float(i) / (num_cvs - 1)
+
+            if lower_bound <= normalized_i <= upper_bound:
+                weight = 1 - abs(normalized_i - lower_bound) * (num_joints - 1)
+            else:
+                weight = 0
+
+            pm.skinPercent(
+                skin_cluster,
+                "{}.cv[{}]".format(curve_name, i),
+                transformValue=[(joint_list[j], weight)],
+            )
+
+    return skin_cluster

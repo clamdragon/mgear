@@ -12,7 +12,7 @@ from . import settingsUI as sui
 
 # guide info
 AUTHOR = "Miquel Campos"
-URL = "www.miquel-campos.com"
+URL = "www.mcsgear.com"
 EMAIL = ""
 VERSION = [1, 0, 0]
 TYPE = "EPIC_chain_01"
@@ -64,6 +64,7 @@ class Guide(guide.ComponentGuide):
         self.pOverrideNegate = self.addParam("overrideNegate", "bool", False)
         self.pAddJoints = self.addParam("addJoints", "bool", True)
         self.pUseIndex = self.addParam("useIndex", "bool", False)
+        self.pDescriptionName = self.addParam("descriptionName", "bool", True)
         self.pParentJointIndex = self.addParam(
             "parentJointIndex", "long", -1, None, None
         )
@@ -86,7 +87,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
 
-        super(self.__class__, self).__init__(parent=parent)
+        super(componentSettings, self).__init__(parent=parent)
         self.settingsTab = settingsTab()
 
         self.setup_componentSettingWindow()
@@ -124,6 +125,9 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             self.settingsTab.overrideNegate_checkBox, "overrideNegate"
         )
         self.populateCheck(self.settingsTab.addJoints_checkBox, "addJoints")
+        self.populateCheck(
+            self.settingsTab.descriptionName_checkBox, "descriptionName"
+        )
 
     def create_componentLayout(self):
 
@@ -156,6 +160,14 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 self.updateCheck,
                 self.settingsTab.addJoints_checkBox,
                 "addJoints",
+            )
+        )
+
+        self.settingsTab.descriptionName_checkBox.stateChanged.connect(
+            partial(
+                self.updateCheck,
+                self.settingsTab.descriptionName_checkBox,
+                "descriptionName",
             )
         )
 

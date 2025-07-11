@@ -40,6 +40,8 @@ class Guide(guide.ComponentGuide):
     email = EMAIL
     version = VERSION
 
+    ctl_names_description = ["ctl"]
+
     def postInit(self):
         """Initialize the position for the guide"""
         self.save_transform = ["root", "tip", "orbit"]
@@ -88,7 +90,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
 
-        super(self.__class__, self).__init__(parent=parent)
+        super(componentSettings, self).__init__(parent=parent)
         self.settingsTab = settingsTab()
 
         self.setup_componentSettingWindow()

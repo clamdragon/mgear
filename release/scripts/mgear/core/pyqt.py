@@ -5,15 +5,26 @@
 #############################################
 import os
 import traceback
+import contextlib
 import maya.OpenMayaUI as omui
-import pymel.core as pm
-from pymel import versions
+import mgear.pymaya as pm
+from mgear.pymaya import versions
+from maya import cmds
 
 from mgear.vendor.Qt import QtWidgets
 from mgear.vendor.Qt import QtCompat
 from mgear.vendor.Qt import QtGui
 from mgear.vendor.Qt import QtSvg
+from mgear.vendor.Qt import QtCore
 from .six import PY2
+
+# Try importing PySide6, fall back to PySide2 if not available
+try:
+    from PySide6.QtGui import QGuiApplication
+    from PySide6.QtCore import QPoint
+except ImportError:
+    from PySide2.QtGui import QGuiApplication
+    from PySide2.QtCore import QPoint
 
 UI_EXT = "ui"
 
@@ -34,6 +45,15 @@ def _qt_import(binding, shi=False, cui=False):
         from PySide2 import QtGui, QtCore, QtWidgets
         import shiboken2 as shiboken
         from shiboken2 import wrapInstance
+
+        if versions.current() < 20220000:
+            from pyside2uic import compileUi
+
+    elif binding == "PySide6":
+        from PySide6 import QtGui, QtCore, QtWidgets
+        import shiboken6 as shiboken
+        from shiboken6 import wrapInstance
+
         if versions.current() < 20220000:
             from pyside2uic import compileUi
 
@@ -50,6 +70,7 @@ def _qt_import(binding, shi=False, cui=False):
         import PyQt4.QtGui as QtWidgets
         from sip import wrapinstance as wrapInstance
         from PyQt4.uic import compileUi
+
         print("Warning: 'shiboken' is not supported in 'PyQt4' Qt binding")
         shiboken = None
 
@@ -72,7 +93,7 @@ def qt_import(shi=False, cui=False):
         multi: QtGui, QtCore, QtWidgets, wrapInstance
 
     """
-    lookup = ["PySide2", "PySide", "PyQt4"]
+    lookup = ["PySide6", "PySide2", "PySide", "PyQt4"]
 
     preferredBinding = os.environ.get("MGEAR_PYTHON_QT_BINDING", None)
     if preferredBinding is not None and preferredBinding in lookup:
@@ -104,8 +125,9 @@ if versions.current() < 20220000:
                 dialogStyle=2,
                 fileMode=1,
                 startingDirectory=startDir,
-                fileFilter='PyQt Designer (*%s)' % UI_EXT,
-                okc="Compile to .py")
+                fileFilter="PyQt Designer (*%s)" % UI_EXT,
+                okc="Compile to .py",
+            )
             if not filePath:
                 return False
             filePath = filePath[0]
@@ -115,7 +137,7 @@ if versions.current() < 20220000:
         if not filePath.endswith(UI_EXT):
             filePath += UI_EXT
         compiledFilePath = filePath[:-2] + "py"
-        pyfile = open(compiledFilePath, 'w')
+        pyfile = open(compiledFilePath, "w")
         compileUi(filePath, pyfile, False, 4, False)
         pyfile.close()
 
@@ -135,6 +157,31 @@ def maya_main_window():
     if PY2:
         return QtCompat.wrapInstance(long(main_window_ptr), QtWidgets.QWidget)
     return QtCompat.wrapInstance(int(main_window_ptr), QtWidgets.QWidget)
+
+
+def center_window_on_screen(window):
+    """Center the given window on the primary screen.
+
+    Args:
+        window (QWidget): The window to center.
+    """
+    # Get the primary screen (compatible with PySide2 and PySide6)
+    screen = QGuiApplication.primaryScreen()
+
+    # Get the screen's rectangle (geometry)
+    screen_geometry = screen.geometry()
+
+    # Get the center point of the screen
+    screen_center = screen_geometry.center()
+
+    # Get the rectangle of the window
+    window_geometry = window.frameGeometry()
+
+    # Get the center point of the window
+    window_center = window_geometry.center()
+
+    # Move the window to the center of the screen
+    window.move(QPoint(screen_center - window_center))
 
 
 def showDialog(dialog, dInst=True, dockable=False, *args):
@@ -166,11 +213,12 @@ def showDialog(dialog, dInst=True, dockable=False, *args):
         if pm.workspaceControl(control, q=True, exists=True):
             pm.workspaceControl(control, e=True, close=True)
             pm.deleteUI(control, control=True)
-    desktop = QtWidgets.QApplication.desktop()
-    screen = desktop.screen()
-    screen_center = screen.rect().center()
-    windw_center = windw.rect().center()
-    windw.move(screen_center - windw_center)
+    # desktop = QtWidgets.QApplication.desktop()
+    # screen = desktop.screen()
+    # screen_center = screen.rect().center()
+    # windw_center = windw.rect().center()
+    # windw.move(screen_center - windw_center)
+    center_window_on_screen(windw)
 
     # Delete the UI if errors occur to avoid causing winEvent
     # and event errors (in Maya 2014)
@@ -200,7 +248,7 @@ def deleteInstances(dialog, checkinstance):
     for obj in mayaMainWindow.children():
         if isinstance(obj, checkinstance):
             if obj.widget().objectName() == dialog.toolName:
-                print(('Deleting instance {0}'.format(obj)))
+                print(("Deleting instance {0}".format(obj)))
                 mayaMainWindow.removeDockWidget(obj)
                 obj.setParent(None)
                 obj.deleteLater()
@@ -217,7 +265,7 @@ def fakeTranslate(*args):
 
 
 def position_window(window):
-    """ set the position for the windonw
+    """set the position for the windonw
 
     Function borrowed from Cesar Saez QuickLauncher
     Args:
@@ -292,9 +340,49 @@ def get_top_level_widgets(class_name=None, object_name=None):
     return matches
 
 
-def get_icon_path(icon_name=None):
-    """ Gets the directory path to the icon
+def clear_layout(layout):
+    """Removes all the widgets added in the given layout.
+
+    Args:
+         layout (QtWidgets.QLayout): Qt layout to clear.
     """
+
+    while layout.count():
+        child = layout.takeAt(0)
+        if child.widget() is not None:
+            child.widget().deleteLater()
+        elif child.layout() is not None:
+            clear_layout(child.layout())
+
+
+@contextlib.contextmanager
+def block_signals(widget, children=False):
+    """Python context that block the signals of the widget and unblock them once wrapped code has been executed.
+
+    Args:
+        widget (QtWidgets.QWidget): Widget we want to block signals for.
+        children (bool): Whether signals of given children widgets should be blocked or not.
+    """
+
+    blocked = widget.signalsBlocked()
+    blocked_children = list()
+    widget.blockSignals(True)
+    child_widgets = (
+        widget.findChildren(QtWidgets.QWidget) if children else list()
+    )
+    for child_widget in child_widgets:
+        blocked_children.append(child_widget.signalsBlocked())
+        child_widget.blockSignals(True)
+    try:
+        yield widget
+    finally:
+        widget.blockSignals(blocked)
+        for i, child_widget in enumerate(child_widgets):
+            child_widget.blockSignals(blocked_children[i])
+
+
+def get_icon_path(icon_name=None):
+    """Gets the directory path to the icon"""
 
     file_dir = os.path.dirname(__file__)
 
@@ -308,8 +396,7 @@ def get_icon_path(icon_name=None):
 
 
 def get_icon(icon, size=24):
-    """get svg icon from icon resources folder as a pixel map
-    """
+    """get svg icon from icon resources folder as a pixel map"""
     img = get_icon_path("{}.svg".format(icon))
     svg_renderer = QtSvg.QSvgRenderer(img)
     image = QtGui.QImage(size, size, QtGui.QImage.Format_ARGB32)
@@ -352,3 +439,70 @@ def dpi_scale(value, default=96, min_=1, max_=2):
         # int, float: scaled value
     """
     return value * max(min_, min(get_logicaldpi() / float(default), max_))
+
+
+#############################################
+# use QSettings store/load class
+#############################################
+
+
+class SettingsMixin(object):
+    def __init__(self, parent=None):
+        self.settings = self.create_qsettings_object()
+        self.user_settings = {}
+
+    def create_qsettings_object(self):
+        prefs_folder = cmds.internalVar(userPrefDir=True)
+        settings_file_path = os.path.join(
+            prefs_folder, "mGear_user_settings.ini"
+        )
+        return QtCore.QSettings(settings_file_path, QtCore.QSettings.IniFormat)
+
+    def load_settings(self):
+        for key, (widget, default_value) in self.user_settings.items():
+            value = self.settings.value(key, defaultValue=default_value)
+            # in Maya using python 2 will return string and we need to conver to  bool
+            if value in ["true", "True"]:
+                value = True
+            elif value in ["false", "False"]:
+                value = False
+            else:
+                value = False
+            self._set_widget_value(widget, value)
+            self._connect_widget_signal(widget)
+
+    def save_settings(self):
+        for key, (widget, _) in self.user_settings.items():
+            value = self._get_widget_value(widget)
+            self.settings.setValue(key, value)
+        self.settings.sync()
+
+    def _get_widget_value(self, widget):
+        if isinstance(widget, (QtWidgets.QCheckBox, QtWidgets.QAction)):
+            return widget.isChecked()
+        elif isinstance(widget, QtWidgets.QComboBox):
+            return widget.currentIndex()
+        elif isinstance(widget, QtWidgets.QLineEdit):
+            return widget.text()
+        # Add support for other widget types as needed.
+        # ...
+
+    def _set_widget_value(self, widget, value):
+        if isinstance(widget, (QtWidgets.QCheckBox, QtWidgets.QAction)):
+            widget.setChecked(value)
+        elif isinstance(widget, QtWidgets.QComboBox):
+            widget.setCurrentIndex(int(value))
+        elif isinstance(widget, QtWidgets.QLineEdit):
+            widget.setText(value)
+        # Add support for other widget types as needed.
+        # ...
+
+    def _connect_widget_signal(self, widget):
+        if isinstance(widget, (QtWidgets.QCheckBox, QtWidgets.QAction)):
+            widget.toggled.connect(self.save_settings)
+        elif isinstance(widget, QtWidgets.QComboBox):
+            widget.currentIndexChanged.connect(self.save_settings)
+        elif isinstance(widget, QtWidgets.QLineEdit):
+            widget.textChanged.connect(self.save_settings)
+        # Add support for other widget types as needed.
+        # ...

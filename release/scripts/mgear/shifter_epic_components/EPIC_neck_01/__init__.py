@@ -1,5 +1,5 @@
-import pymel.core as pm
-from pymel.core import datatypes
+import mgear.pymaya as pm
+from mgear.pymaya import datatypes, nodetypes
 
 from mgear.shifter import component
 import ast
@@ -14,7 +14,7 @@ from mgear.core import attribute, transform, primitive, string
 
 class Component(component.Main):
     """Shifter component Class"""
-    axes = ["XZ", "XY", "YZ", "YX", "ZY", "ZX"]
+    # axes = ["XZ", "XY", "YZ", "YX", "ZY", "ZX"]
 
     # =====================================================
     # OBJECTS
@@ -215,6 +215,7 @@ class Component(component.Main):
         # Division -----------------------------------------
         # The user only define how many intermediate division he wants.
         # First and last divisions are an obligation.
+        # for negating any parent scale
         parentdiv = primitive.addTransform(
             self.root,
             self.getName("div_par"),
@@ -224,6 +225,7 @@ class Component(component.Main):
         self.div_cns = []
         self.fk_ctl = []
         self.fk_npo = []
+        # post-scaling controls instead of pre-unscaling offset grps works better, is easier to debug, and matches how spine component works
         self.scl_ref = []
 
         self.twister = []
@@ -667,6 +669,7 @@ class Component(component.Main):
 
         if self.options["force_SSC"]:
             # do it a little different. want to negate only immediate parent's scale
+            # TODO
             pass
 
 
@@ -675,6 +678,7 @@ class Component(component.Main):
     # =====================================================
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
+        # provide a couple more options than just root or head
         self.relatives["root"] = self.fk_ctl[0]
         self.relatives["tan1"] = self.fk_ctl[0]
         self.relatives["tan2"] = self.scl_ref[-1]
@@ -707,13 +711,11 @@ class Component(component.Main):
     def connect_standardWithIkRef(self):
 
         self.parent.addChild(self.root)
-        # self.scale_in_root_space.i[0].set(self.root.m.get())
-        # self.scale_in_root_space.i[2].set(self.root.im.get())
-        # self.parent.m >> self.root_ssc_mtx.imat
+
         if self.options["force_SSC"]:
             # finally, something that functions identically to SSC
             # ssc_mtx_cns = applyop.gear_matrix_cns(self.root.m)
-            ssc_mtx_cns = pm.nt.Mgear_matrixConstraint()
+            ssc_mtx_cns = nodetypes.Mgear_matrixConstraint()
             # don't want PIM connected, it can all be local
             ssc_mtx_cns.driverMatrix.set(self.root.m.get())
             # connect *all*
@@ -728,11 +730,13 @@ class Component(component.Main):
             self.parent.scale >> root_scl_inv.input2
             root_scl_inv.o >> ssc_mtx_cns.drivenInverseScale
 
-        self.connectRef(self.settings["ikrefarray"], self.ik_cns)
-
-        if not self.settings["chickenStyleIK"]:
-            for axis in ["tx", "ty", "tz"]:
-                self.ik_cns.attr(axis).disconnect()
+        if self.settings["chickenStyleIK"]:
+            skipTranslate = "none"
+        else:
+            skipTranslate = ["x", "y", "z"]
+        self.connectRef(
+            self.settings["ikrefarray"], self.ik_cns, st=skipTranslate
+        )
 
         if self.settings["headrefarray"]:
             ref_names = self.settings["headrefarray"].split(",")
@@ -746,9 +750,12 @@ class Component(component.Main):
                 *ref, skipTranslate="none", maintainOffset=True
             )
 
-            cns_attr = pm.parentConstraint(
+            cns_attr_names = pm.parentConstraint(
                 cns_node, query=True, weightAliasList=True
             )
+            cns_attr = []
+            for cname in cns_attr_names:
+                cns_attr.append("{}.{}".format(cns_node, cname))
             self.head_cns.attr("tx").disconnect()
             self.head_cns.attr("ty").disconnect()
             self.head_cns.attr("tz").disconnect()

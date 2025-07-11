@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'C:/Users/Brendan/OneDrive/3D/ROBOT/ArtTools/mainline/Maya/modules/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_leg_3jnt_01/settingsUI.ui',
-# licensing of 'C:/Users/Brendan/OneDrive/3D/ROBOT/ArtTools/mainline/Maya/modules/mgear4/release/scripts/mgear/shifter_epic_components/EPIC_leg_3jnt_01/settingsUI.ui' applies.
+# Form implementation generated from reading ui file 'C:/datawork/repo/Shifter_MCS_components/components/EPIC_leg_3jnt_01/settingsUI.ui'
 #
-# Created: Thu Jun 29 12:25:07 2023
-#      by: pyside2-uic  running on PySide2 5.12.5
+# Created: Mon Feb 27 14:17:44 2023
+#      by: pyside2-uic  running on PySide2 2.0.0~alpha0
 #
 # WARNING! All changes made in this file will be lost!
 
-from PySide2 import QtCore, QtGui, QtWidgets
+import mgear.core.pyqt as gqt
+QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 class Ui_Form(object):
     def setupUi(self, Form):
@@ -107,17 +107,17 @@ class Ui_Form(object):
         self.divisions_label.setObjectName("divisions_label")
         self.horizontalLayout.addWidget(self.divisions_label)
         self.div0_spinBox = QtWidgets.QSpinBox(self.groupBox)
-        self.div0_spinBox.setMinimum(1)
+        self.div0_spinBox.setMinimum(0)
         self.div0_spinBox.setProperty("value", 2)
         self.div0_spinBox.setObjectName("div0_spinBox")
         self.horizontalLayout.addWidget(self.div0_spinBox)
         self.div1_spinBox = QtWidgets.QSpinBox(self.groupBox)
-        self.div1_spinBox.setMinimum(1)
+        self.div1_spinBox.setMinimum(0)
         self.div1_spinBox.setProperty("value", 2)
         self.div1_spinBox.setObjectName("div1_spinBox")
         self.horizontalLayout.addWidget(self.div1_spinBox)
         self.div2_spinBox = QtWidgets.QSpinBox(self.groupBox)
-        self.div2_spinBox.setMinimum(1)
+        self.div2_spinBox.setMinimum(0)
         self.div2_spinBox.setProperty("value", 2)
         self.div2_spinBox.setObjectName("div2_spinBox")
         self.horizontalLayout.addWidget(self.div2_spinBox)

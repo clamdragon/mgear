@@ -6,9 +6,9 @@ import sys
 import json
 
 # Maya
-import pymel.core as pm
-from pymel.core import datatypes
-from pymel import versions
+import mgear.pymaya as pm
+from mgear.pymaya import datatypes
+from mgear.pymaya import versions
 
 # mgear
 import mgear
@@ -20,6 +20,7 @@ from mgear import shifter_classic_components
 from mgear import shifter_epic_components
 from mgear.shifter import naming
 import importlib
+from mgear.core import utils
 
 PY2 = sys.version_info[0] == 2
 
@@ -34,9 +35,6 @@ if not pm.pluginInfo("matrixNodes", q=True, loaded=True):
 
 COMPONENT_PATH = os.path.join(os.path.dirname(__file__), "component")
 TEMPLATE_PATH = os.path.join(COMPONENT_PATH, "templates")
-SYNOPTIC_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), os.pardir, "synoptic", "tabs")
-)
 
 SHIFTER_COMPONENT_ENV_KEY = "MGEAR_SHIFTER_COMPONENT_PATH"
 
@@ -45,6 +43,11 @@ def log_window():
     if mgear.logMode and mgear.use_log_window:
         log_window_name = "mgear_shifter_build_log_window"
         log_window_field_reporter = "mgear_shifter_log_field_reporter"
+
+        # call pm.window(log_window_name, exists=True) 2 times to avoid
+        # false check in Maya 2024
+        pm.window(log_window_name, exists=True)
+
         if not pm.window(log_window_name, exists=True):
             log_win = pm.window(
                 log_window_name,
@@ -84,7 +87,9 @@ def log_window():
             pm.setParent("..")
             pm.showWindow(log_win)
         else:
-            pm.cmdScrollFieldReporter(log_window_field_reporter, e=True, clr=True)
+            pm.cmdScrollFieldReporter(
+                log_window_field_reporter, e=True, clr=True
+            )
             pm.showWindow(log_window_name)
         mgear.logInfos()
 
@@ -107,7 +112,7 @@ def getComponentDirectories():
 def importComponentGuide(comp_type):
     """Import the Component guide"""
     dirs = getComponentDirectories()
-    defFmt = "mgear.core.shifter.component.{}.guide"
+    defFmt = "mgear.shifter.component.{}.guide"
     customFmt = "{}.guide"
 
     module = mgear.core.utils.importFromStandardOrCustomDirectories(
@@ -119,7 +124,7 @@ def importComponentGuide(comp_type):
 def importComponent(comp_type):
     """Import the Component"""
     dirs = getComponentDirectories()
-    defFmt = "mgear.core.shifter.component.{}"
+    defFmt = "mgear.shifter.component.{}"
     customFmt = "{}"
 
     module = mgear.core.utils.importFromStandardOrCustomDirectories(
@@ -140,8 +145,8 @@ def reloadComponents(*args):
         for com in compDir[x]:
             try:
                 if PY2:
-                    reload(importComponent(com))
-                    reload(importComponentGuide(com))
+                    reload(importComponent(com)) # type: ignore
+                    reload(importComponentGuide(com)) # type: ignore
                 else:
                     importlib.reload(importComponent(com))
                     importlib.reload(importComponentGuide(com))
@@ -169,6 +174,9 @@ class Rig(object):
         self.groups = {}
         self.subGroups = {}
 
+        self.bindPlanes = {}
+        self.combinedBindPlanes = {}
+
         self.components = {}
         self.componentsIndex = []
 
@@ -176,8 +184,7 @@ class Rig(object):
 
         self.build_data = {}
 
-        self.component_finalize = False
-
+    @utils.one_undo
     def buildFromDict(self, conf_dict):
         log_window()
         startTime = datetime.datetime.now()
@@ -190,7 +197,9 @@ class Rig(object):
         finalTime = endTime - startTime
         mgear.log(
             "\n"
-            + "= SHIFTER FILE READ {} [ {} ] {}".format("=" * 16, finalTime, "=" * 7)
+            + "= SHIFTER FILE READ {} [ {} ] {}".format(
+                "=" * 16, finalTime, "=" * 7
+            )
         )
 
         # Build
@@ -199,17 +208,20 @@ class Rig(object):
         self.build()
         self.from_dict_custom_step(conf_dict, pre=False)
         # Collect post-build data
-        build_data = self.collect_build_data()
+        if self.options["data_collector_embedded"] or self.options["data_collector"]:
+            build_data = self.collect_build_data()
+        else:
+            build_data = None
 
         endTime = datetime.datetime.now()
         finalTime = endTime - startTime
-        pm.flushUndo()
-        pm.displayInfo(
-            "Undo history have been flushed to avoid "
-            "possible crash after rig is build. \n"
-            "More info: "
-            "https://github.com/miquelcampos/mgear/issues/72"
-        )
+        # pm.flushUndo()
+        # pm.displayInfo(
+        #     "Undo history have been flushed to avoid "
+        #     "possible crash after rig is build. \n"
+        #     "More info: "
+        #     "https://github.com/miquelcampos/mgear/issues/72"
+        # )
         mgear.log(
             "\n"
             + "= SHIFTER BUILD RIG DONE {} [ {} ] {}".format(
@@ -219,6 +231,7 @@ class Rig(object):
 
         return build_data
 
+    @utils.one_undo
     def buildFromSelection(self):
         """Build the rig from selected guides."""
 
@@ -257,17 +270,20 @@ class Rig(object):
                 self.postCustomStep()
 
             # Collect post-build data
-            build_data = self.collect_build_data()
+            if self.options["data_collector_embedded"] or self.options["data_collector"]:
+                build_data = self.collect_build_data()
+            else:
+                build_data = None
 
             endTime = datetime.datetime.now()
             finalTime = endTime - startTime
-            pm.flushUndo()
-            pm.displayInfo(
-                "Undo history have been flushed to avoid "
-                "possible crash after rig is build. \n"
-                "More info: "
-                "https://github.com/miquelcampos/mgear/issues/72"
-            )
+            # pm.flushUndo()
+            # pm.displayInfo(
+            #     "Undo history have been flushed to avoid "
+            #     "possible crash after rig is build. \n"
+            #     "More info: "
+            #     "https://github.com/miquelcampos/mgear/issues/72"
+            # )
             mgear.log(
                 "\n"
                 + "= SHIFTER BUILD RIG DONE {} [ {} ] {}".format(
@@ -348,6 +364,18 @@ class Rig(object):
                 customSteps = [cs.replace("\\", "/") for cs in customSteps]
             self.customStep(customSteps)
 
+    # @utils.timeFunc
+    def get_guide_data(self):
+        """Get the guide data
+
+        Returns:
+            str: The guide data
+        """
+        if self.guide.guide_template_dict:
+            return json.dumps(self.guide.guide_template_dict)
+        else:
+            return json.dumps(self.guide.get_guide_template_dict())
+
     def initialHierarchy(self):
         """Build the initial hierarchy of the rig.
 
@@ -360,12 +388,18 @@ class Rig(object):
 
         # --------------------------------------------------
         # Model
-        self.model = primitive.addTransformFromPos(None, self.options["rig_name"])
-        attribute.lockAttribute(self.model)
+        self.model = primitive.addTransformFromPos(
+            None, self.options["rig_name"]
+        )
+
+        lockAttrs = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"]
+        attribute.lockAttribute(self.model, attributes=lockAttrs)
 
         # --------------------------------------------------
         # INFOS
-        self.isRig_att = attribute.addAttribute(self.model, "is_rig", "bool", True)
+        self.isRig_att = attribute.addAttribute(
+            self.model, "is_rig", "bool", True
+        )
         self.rigName_att = attribute.addAttribute(
             self.model, "rig_name", "string", self.options["rig_name"]
         )
@@ -387,35 +421,54 @@ class Rig(object):
         self.gearVersion_att = attribute.addAttribute(
             self.model, "gear_version", "string", mgear.getVersion()
         )
-        self.synoptic_att = attribute.addAttribute(
-            self.model, "synoptic", "string", str(self.options["synoptic"])
-        )
         self.comments_att = attribute.addAttribute(
             self.model, "comments", "string", str(self.options["comments"])
         )
-        self.ctlVis_att = attribute.addAttribute(self.model, "ctl_vis", "bool", True)
+        self.ctlVis_att = attribute.addAttribute(
+            self.model, "ctl_vis", "bool", True
+        )
         if versions.current() >= 201650:
             self.ctlVisPlayback_att = attribute.addAttribute(
                 self.model, "ctl_vis_on_playback", "bool", True
             )
-        self.jntVis_att = attribute.addAttribute(self.model, "jnt_vis", "bool", True)
+        self.jntVis_att = attribute.addAttribute(
+            self.model, "jnt_vis", "bool", True
+        )
         # adding the always draw shapes on top to global attribute
         if versions.current() >= 20220000:
             self.ctlXRay_att = attribute.addAttribute(
                 self.model, "ctl_x_ray", "bool", False
             )
 
-        self.qsA_att = attribute.addAttribute(self.model, "quickselA", "string", "")
-        self.qsB_att = attribute.addAttribute(self.model, "quickselB", "string", "")
-        self.qsC_att = attribute.addAttribute(self.model, "quickselC", "string", "")
-        self.qsD_att = attribute.addAttribute(self.model, "quickselD", "string", "")
-        self.qsE_att = attribute.addAttribute(self.model, "quickselE", "string", "")
-        self.qsF_att = attribute.addAttribute(self.model, "quickselF", "string", "")
+        self.qsA_att = attribute.addAttribute(
+            self.model, "quickselA", "string", ""
+        )
+        self.qsB_att = attribute.addAttribute(
+            self.model, "quickselB", "string", ""
+        )
+        self.qsC_att = attribute.addAttribute(
+            self.model, "quickselC", "string", ""
+        )
+        self.qsD_att = attribute.addAttribute(
+            self.model, "quickselD", "string", ""
+        )
+        self.qsE_att = attribute.addAttribute(
+            self.model, "quickselE", "string", ""
+        )
+        self.qsF_att = attribute.addAttribute(
+            self.model, "quickselF", "string", ""
+        )
 
         self.rigGroups = self.model.addAttr("rigGroups", at="message", m=1)
         self.rigPoses = self.model.addAttr("rigPoses", at="message", m=1)
         self.rigCtlTags = self.model.addAttr("rigCtlTags", at="message", m=1)
-        self.rigScriptNodes = self.model.addAttr("rigScriptNodes", at="message", m=1)
+        self.rigScriptNodes = self.model.addAttr(
+            "rigScriptNodes", at="message", m=1
+        )
+
+        self.guide_data_att = attribute.addAttribute(
+            self.model, "guide_data", "string", self.get_guide_data()
+        )
 
         # ------------------------- -------------------------
         # Global Ctl
@@ -456,6 +509,7 @@ class Rig(object):
         # --------------------------------------------------
         # Basic set of null
         if self.options["joint_rig"]:
+            self.root_joint = None
             self.jnt_org = primitive.addTransformFromPos(self.model, "jnt_org")
             if self.options["force_SSC"]:
                 self.global_ctl.s >> self.jnt_org.s
@@ -493,10 +547,10 @@ class Rig(object):
             # for count, compName in enumerate(self.componentsIndex):
             for compName in self.componentsIndex:
                 comp = self.components[compName]
-                mgear.log(name + " : " + comp.fullName + " (" + comp.type + ")")
+                mgear.log(
+                    name + " : " + comp.fullName + " (" + comp.type + ")"
+                )
                 comp.stepMethods[i]()
-                if name == "Finalize":
-                    self.component_finalize = True
 
             if self.options["step"] >= 1 and i >= self.options["step"] - 1:
                 break
@@ -566,10 +620,19 @@ class Rig(object):
 
         # hide all DG nodes inputs in channel box -----------------------
         # only hides if components_finalize or All steps are done
-        if self.component_finalize:
+        # if not WIP mode we will hide all the inputs
+        if not self.options["mode"]:
             for c in self.model.listHistory(ac=True, f=True):
                 if c.type() != "transform":
                     c.isHistoricallyInteresting.set(False)
+            try:
+                # hide a guide if the guide_vis pram is turned off
+                if self.guide.model.hasAttr("guide_vis"):
+                    if not self.guide.model.guide_vis.get():
+                        self.guide.model.hide()
+            except AttributeError:
+                # catch error in case we build from serialized guide
+                pass
 
         # Bind skin re-apply
         if self.options["importSkin"]:
@@ -592,6 +655,27 @@ class Rig(object):
         Returns:
             dict: The collected data
         """
+        # print("self.guide.guide_template_dict>>>>>>>>>>>>>>>>>")
+        # print(self.guide.guide_template_dict["guide_root"]["param_values"])
+        # options in dictionary form
+        # self.options_dict = self.guide.guide_template_dict["guide_root"]["param_values"]
+        # print(self.options)
+        # print(self.guide.guide_template_dict["guide_root"]["param_values"])
+        # print(self.options)
+        self.build_data["MainSettings"] = self.guide.guide_template_dict["guide_root"]["param_values"]
+        self.build_data["MainSettings"]["size"] = self.options["size"]
+        # print(self.build_data["MainSettings"])
+
+        # replace the MVector with his value in a list
+        # keys_to_update = [
+        #     'L_RGB_fk', 'L_RGB_ik',
+        #     'R_RGB_fk', 'R_RGB_ik',
+        #     'C_RGB_fk', 'C_RGB_ik'
+        #     ]
+        # for key in keys_to_update:
+        #     self.build_data["MainSettings"][key] == self.guide.guide_template_dict["guide_root"]["param_values"][key]
+        # print(self.build_data["MainSettings"])
+        # self.build_data["MainSettings"] = self.guide.guide_template_dict["guide_root"]["param_values"]
         self.build_data["Components"] = []
         for c, comp in self.customStepDic["mgearRun"].components.items():
             self.build_data["Components"].append(comp.build_data)
@@ -601,7 +685,6 @@ class Rig(object):
             self.add_collected_data_to_root_jnt(root_jnt=root_jnt)
         if self.options["data_collector"]:
             self.data_collector_output(self.options["data_collector_path"])
-
         return self.build_data
 
     def data_collector_output(self, file_path=None):
@@ -611,9 +694,10 @@ class Rig(object):
             file_path (Str, optional): Output path for the Json File
         """
         if not file_path:
-            ext_filter = "Shifter Collected data (*{})".format(guide.DATA_COLLECTOR_EXT)
+            ext_filter = "Shifter Collected data (*{})".format(
+                guide.DATA_COLLECTOR_EXT
+            )
             file_path = pm.fileDialog2(fileMode=0, fileFilter=ext_filter)[0]
-
         with open(file_path, "w") as f:
             f.write(json.dumps(self.build_data, indent=4))
             file_path = None
@@ -647,7 +731,9 @@ class Rig(object):
             try:
                 return pm.PyNode(j_name)
             except pm.MayaNodeError:
-                pm.displayError("{} doesn't exist or is not unique".format(j_name))
+                pm.displayError(
+                    "{} doesn't exist or is not unique".format(j_name)
+                )
 
     def addCtl(self, parent, name, m, color, iconShape, **kwargs):
         """Create the control and apply the shape, if this is alrealdy stored
@@ -686,7 +772,9 @@ class Rig(object):
             oShape.isHistoricallyInteresting.set(False)
             # connecting the always draw shapes on top to global attribute
             if versions.current() >= 20220000:
-                pm.connectAttr(self.ctlXRay_att, oShape.attr("alwaysDrawOnTop"))
+                pm.connectAttr(
+                    self.ctlXRay_att, oShape.attr("alwaysDrawOnTop")
+                )
 
         # set controller tag
         if versions.current() >= 201650:
@@ -903,6 +991,8 @@ class Rig(object):
             return self.ui
 
         if self.components[comp_name].ui is None:
-            self.components[comp_name].ui = pm.UIHost(self.components[comp_name].root)
+            self.components[comp_name].ui = pm.UIHost(
+                self.components[comp_name].root
+            )
 
         return self.components[comp_name].ui

@@ -23,13 +23,13 @@
 from copy import copy
 import struct
 
-from mgear.vendor.Qt import QtGui, QtCore, QtWidgets
+from mgear.vendor.Qt import QtGui, QtCore, QtWidgets, QtCompat
 
 
 FLOAT_SLIDER_DRAG_STEPS = [100.0, 10.0, 1.0, 0.1, 0.01, 0.001]
 INT_SLIDER_DRAG_STEPS = [100.0, 10.0, 1.0]
 
-maxint = 2 ** (struct.Struct('i').size * 8 - 1) - 1
+maxint = 2 ** (struct.Struct("i").size * 8 - 1) - 1
 
 FLOAT_RANGE_MIN = 0.1 + (-maxint - 1.0)
 FLOAT_RANGE_MAX = maxint + 0.1
@@ -78,7 +78,9 @@ def getSliderStyleSheet(name):
         QSlider::handle:horizontal {
             width: 1px;
          }
-        """ % "rgba%s" % str(MainColor.getRgb()),
+        """
+        % "rgba%s"
+        % str(MainColor.getRgb()),
         "sliderStyleSheetB": """
         QSlider::groove:horizontal {
             border: 1px solid #bbb;
@@ -129,7 +131,9 @@ def getSliderStyleSheet(name):
             border-radius: 2px;
             height : 10;
         }
-        """ % "rgba%s" % str(MainColor.getRgb()),
+        """
+        % "rgba%s"
+        % str(MainColor.getRgb()),
         "sliderStyleSheetC": """
         QSlider,QSlider:disabled,QSlider:focus{
                                   background: qcolor(0,0,0,0);   }
@@ -147,7 +151,9 @@ def getSliderStyleSheet(name):
          QSlider::handle:horizontal:hover {
             border: 2.25px solid %s;
          }
-        """ % "rgba%s" % str(MainColor.getRgb()),
+        """
+        % "rgba%s"
+        % str(MainColor.getRgb()),
         "draggerstyleSheet": """
         QGroupBox{
             border: 0.5 solid darkgrey;
@@ -171,7 +177,9 @@ def getSliderStyleSheet(name):
             border: 0 solid transparent;
             color: white;
         }
-        """ % "rgba%s" % str(MainColor.getRgb()),
+        """
+        % "rgba%s"
+        % str(MainColor.getRgb()),
         "timeStyleSheet": """
         QSlider,QSlider:disabled,QSlider:focus{
                                   background: qcolor(0,0,0,0);   }
@@ -183,7 +191,9 @@ def getSliderStyleSheet(name):
             background:  %s;
             width: 3px;
          }
-        """ % "rgba%s" % str(MainColor.getRgb())
+        """
+        % "rgba%s"
+        % str(MainColor.getRgb()),
     }
     return Styles[name]
 
@@ -191,6 +201,7 @@ def getSliderStyleSheet(name):
 #########################################
 # Helper functions
 #########################################
+
 
 def lerp(start, end, alpha):
     """Performs a linear interpolation
@@ -202,7 +213,7 @@ def lerp(start, end, alpha):
     :param alpha: alpha how far to interpolate
     :returns: The result of the linear interpolation
     """
-    return (start + alpha * (end - start))
+    return start + alpha * (end - start)
 
 
 def clamp(n, vmin, vmax):
@@ -300,7 +311,8 @@ class inputDragger(QtWidgets.QWidget):
             for drag in self.parent.drags:
                 if drag != self:
                     drag.setStyleSheet(
-                        getSliderStyleSheet("draggerstyleSheet"))
+                        getSliderStyleSheet("draggerstyleSheet")
+                    )
         if event.type() == QtCore.QEvent.HoverLeave:
             if event.pos().y() > self.height() or event.pos().y() < 0:
                 self.setStyleSheet(getSliderStyleSheet("draggerstyleSheet"))
@@ -321,10 +333,9 @@ class draggers(QtWidgets.QWidget):
 
     increment = QtCore.Signal(object)
 
-    def __init__(self,
-                 parent=None,
-                 isFloat=True,
-                 draggerSteps=FLOAT_SLIDER_DRAG_STEPS):
+    def __init__(
+        self, parent=None, isFloat=True, draggerSteps=FLOAT_SLIDER_DRAG_STEPS
+    ):
         super(draggers, self).__init__(parent)
         self.initialPos = None
         self.setLayout(QtWidgets.QVBoxLayout())
@@ -349,21 +360,24 @@ class draggers(QtWidgets.QWidget):
             if self.activeDrag:
                 modifiers = event.modifiers()
                 self.activeDrag.setStyleSheet(
-                    getSliderStyleSheet("draggerstyleSheetHover"))
+                    getSliderStyleSheet("draggerstyleSheetHover")
+                )
                 if self.initialPos is None:
                     self.initialPos = event.globalPos()
                 deltaX = event.globalPos().x() - self.initialPos.x()
-                self._changeDirection = clamp(deltaX - self.lastDeltaX,
-                                              -1.0,
-                                              1.0)
+                self._changeDirection = clamp(
+                    deltaX - self.lastDeltaX, -1.0, 1.0
+                )
 
                 if self._changeDirection != 0:
                     v = self._changeDirection * self.activeDrag._factor
 
                     if modifiers == QtCore.Qt.NoModifier and deltaX % 4 == 0:
                         self.increment.emit(v)
-                    modif = [QtCore.Qt.ShiftModifier,
-                             QtCore.Qt.ControlModifier]
+                    modif = [
+                        QtCore.Qt.ShiftModifier,
+                        QtCore.Qt.ControlModifier,
+                    ]
                     if modifiers in modif and deltaX % 8 == 0:
                         self.increment.emit(v)
                     modif = QtCore.Qt.ShiftModifier | QtCore.Qt.ControlModifier
@@ -375,7 +389,7 @@ class draggers(QtWidgets.QWidget):
         if event.type() == QtCore.QEvent.MouseButtonRelease:
             self.hide()
             self.lastDeltaX = 0
-            del(self)
+            del self
         return False
 
 
@@ -393,15 +407,21 @@ class slider(QtWidgets.QSlider):
     Extends:
         QtWidgets.QSlider
     """
+
     editingFinished = QtCore.Signal()
+    editingStart = QtCore.Signal()
     valueIncremented = QtCore.Signal(object)
     floatValueChanged = QtCore.Signal(object)
 
-    def __init__(self, parent=None,
-                 draggerSteps=INT_SLIDER_DRAG_STEPS,
-                 sliderRange=[-100, 100],
-                 *args,
-                 **kwargs):
+    def __init__(
+        self,
+        custom_signals,
+        parent=None,
+        draggerSteps=INT_SLIDER_DRAG_STEPS,
+        sliderRange=[-100, 100],
+        *args,
+        **kwargs
+    ):
         super(slider, self).__init__(parent, **kwargs)
         self.sliderRange = sliderRange
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
@@ -412,29 +432,43 @@ class slider(QtWidgets.QSlider):
         self.startDragpos = QtCore.QPointF()
         self.realStartDragpos = QtCore.QPointF()
         self.LeftButton = QtCore.Qt.LeftButton
-        self.MidButton = QtCore.Qt.MidButton
+
+        # Try importing PySide6, fall back to PySide2 if not available
+        try:
+            MiddleButton = QtCompat.Qt.MidButton
+        except ImportError:
+            MiddleButton = QtCore.Qt.MidButton
+
+        self.MidButton = MiddleButton
         self.draggers = None
-        # if SessionDescriptor().software == "maya":
-        self.LeftButton = QtCore.Qt.MidButton
-        self.MidButton = QtCore.Qt.LeftButton
-        self.defaultValue = 0
+        self._click_offset = 0
+        self._prev_x = 0
+        self.custom_signals = custom_signals
 
         self.setRange(self.sliderRange[0], self.sliderRange[1])
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self.sliderMoved.emit(self.value())  # emit signal with new value
+        self.editingFinished.emit()
+        # if self.parent():
+        #     self.parent().mouseReleaseEvent(event)
+
     def mousePressEvent(self, event):
+        self.editingStart.emit()
+        if self.parent():
+            self.parent().mousePressEvent(event)
         self.prevValue = self.value()
         self.startDragpos = event.pos()
 
         emodif = event.modifiers()
-        modif = [QtCore.Qt.ControlModifier,
-                 QtCore.Qt.ShiftModifier,
-                 QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier]
+        modif = [QtCore.Qt.ControlModifier, QtCore.Qt.ShiftModifier]
 
-        if event.button() == QtCore.Qt.MidButton:
+        if event.button() == self.MidButton:
             if self.draggers is None:
-                self.draggers = draggers(self,
-                                         self.isFloat,
-                                         draggerSteps=self.draggerSteps)
+                self.draggers = draggers(
+                    self, self.isFloat, draggerSteps=self.draggerSteps
+                )
                 self.draggers.increment.connect(self.valueIncremented.emit)
             self.draggers.show()
             if self.isFloat:
@@ -442,74 +476,110 @@ class slider(QtWidgets.QSlider):
                     self.mapToGlobal(
                         QtCore.QPoint(
                             event.pos().x() - 1,
-                            event.pos().y() - self.draggers.height() / 2)))
+                            event.pos().y() - self.draggers.height() / 2,
+                        )
+                    )
+                )
             else:
                 self.draggers.move(
                     self.mapToGlobal(
                         QtCore.QPoint(
                             event.pos().x() - 1,
-                            event.pos().y() - (self.draggers.height()
-                                               - self.draggers.height()
-                                               / 6))))
+                            event.pos().y()
+                            - (
+                                self.draggers.height()
+                                - self.draggers.height() / 6
+                            ),
+                        )
+                    )
+                )
 
-        elif event.button() == self.LeftButton and emodif not in modif:
-            butts = QtCore.Qt.MouseButtons(self.MidButton)
-            nevent = QtGui.QMouseEvent(event.type(), event.pos(),
-                                       self.MidButton, butts,
-                                       event.modifiers())
+        elif (
+            event.button() == self.LeftButton
+            and emodif == QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier
+        ):
+            butts = QtCore.Qt.MouseButtons(self.LeftButton)
+            nevent = QtGui.QMouseEvent(
+                event.type(),
+                event.pos(),
+                self.LeftButton,
+                butts,
+                event.modifiers(),
+            )
             super(slider, self).mousePressEvent(nevent)
 
-        elif emodif in modif:
-            st_slider = QtWidgets.QStyleOptionSlider()
-            st_slider.initFrom(self)
-            st_slider.orientation = self.orientation()
-            available = self.style().pixelMetric(
-                QtWidgets.QStyle.PM_SliderSpaceAvailable,
-                st_slider, self)
-            xloc = QtWidgets.QStyle.sliderPositionFromValue(
-                self.minimum(),
-                self.maximum(),
-                super(slider, self).value(),
-                available)
-            butts = QtCore.Qt.MouseButtons(self.MidButton)
-            newPos = QtCore.QPointF()
-            newPos.setX(xloc)
-            nevent = QtGui.QMouseEvent(event.type(), newPos,
-                                       self.MidButton, butts,
-                                       event.modifiers())
-            self.startDragpos = newPos
-            self.realStartDragpos = event.pos()
-            super(slider, self).mousePressEvent(nevent)
-            self.deltaValue = self.value() - self.prevValue
-            self.setValue(self.prevValue)
-        else:
-            super(slider, self).mousePressEvent(event)
+        elif event.button() == self.LeftButton or emodif in modif:
+            opt = QtWidgets.QStyleOptionSlider()
+            opt.initFrom(self)
+            opt.subControls = QtWidgets.QStyle.SC_None
+            opt.activeSubControls = QtWidgets.QStyle.SC_None
+            opt.orientation = self.orientation()
+            opt.maximum = self.maximum()
+            opt.minimum = self.minimum()
+            opt.pageStep = self.pageStep()
+            opt.sliderPosition = self.sliderPosition()
+            opt.sliderValue = self.value()
+
+            hit = self.style().hitTestComplexControl(
+                QtWidgets.QStyle.CC_Slider, opt, event.pos(), self
+            )
+            if hit == QtWidgets.QStyle.SC_SliderHandle:
+                super(slider, self).mousePressEvent(event)
+                self._click_offset = (
+                    event.pos().x()
+                    - self.style().sliderPositionFromValue(
+                        self.minimum(),
+                        self.maximum(),
+                        self.value(),
+                        self.width() - 16,
+                    )
+                )
+            else:
+                slider_handle_pos = self.style().sliderPositionFromValue(
+                    self.minimum(),
+                    self.maximum(),
+                    self.value(),
+                    self.width() - 16,
+                )
+                self._click_offset = event.pos().x() - slider_handle_pos
+                self.mouseMoveEvent(event)
 
     def mouseMoveEvent(self, event):
-        deltaX = event.pos().x() - self.realStartDragpos.x()
-        deltaY = event.pos().y() - self.realStartDragpos.y()
-        newPos = QtCore.QPointF()
-
-        modif = [QtCore.Qt.ControlModifier,
-                 QtCore.Qt.ShiftModifier,
-                 QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier]
+        modif = [QtCore.Qt.ControlModifier, QtCore.Qt.ShiftModifier]
         modif_ctl_shift = QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier
 
-        if event.modifiers() in modif:
-            if event.modifiers() == QtCore.Qt.ControlModifier:
-                newPos.setX(self.startDragpos.x() + deltaX / 2)
-                newPos.setY(self.startDragpos.y() + deltaY / 2)
-            elif event.modifiers() == QtCore.Qt.ShiftModifier:
-                newPos.setX(self.startDragpos.x() + deltaX / 4)
-                newPos.setY(self.startDragpos.y() + deltaY / 4)
-            elif event.modifiers() == modif_ctl_shift:
-                newPos.setX(self.startDragpos.x() + deltaX / 8)
-                newPos.setY(self.startDragpos.y() + deltaY / 8)
-            nevent = QtGui.QMouseEvent(event.type(), newPos,
-                                       event.button(), event.buttons(),
-                                       event.modifiers())
-            super(slider, self).mouseMoveEvent(nevent)
-            self.setValue(self.value() - self.deltaValue)
+        if event.modifiers() == modif_ctl_shift:
+            super(slider, self).mouseMoveEvent(event)
+        elif event.buttons() & QtCore.Qt.LeftButton:
+            if event.modifiers() in modif:
+                new_position = event.pos().x() - self._click_offset
+
+                # modifiers = QGuiApplication.queryKeyboardModifiers()
+                if event.modifiers() == (QtCore.Qt.ControlModifier):
+                    step_size = 0.01
+                elif event.modifiers() == QtCore.Qt.ShiftModifier:
+                    step_size = 0.1
+                else:
+                    step_size = 1.0
+
+                new_value = round(self.value() / (1000 * step_size)) * (
+                    1000 * step_size
+                ) + int(step_size * 1000) * (
+                    1 if event.pos().x() > self._prev_x else -1
+                )
+                self.setValue(new_value)
+                self._prev_x = event.pos().x()
+                event.accept()
+            else:
+                new_position = event.pos().x() - self._click_offset
+                new_value = self.style().sliderValueFromPosition(
+                    self.minimum(),
+                    self.maximum(),
+                    new_position,
+                    self.width() - 16,
+                )
+                self.setValue(new_value)
+                event.accept()
         else:
             super(slider, self).mouseMoveEvent(event)
 
@@ -530,14 +600,18 @@ class slider(QtWidgets.QSlider):
 class DoubleSlider(slider):
     doubleValueChanged = QtCore.Signal(float)
 
-    def __init__(self, parent=None,
-                 sliderRange=(-100.0, 100.0),
-                 defaultValue=0.0,
-                 dencity=1000000,
-                 draggerSteps=FLOAT_SLIDER_DRAG_STEPS):
-        super(DoubleSlider, self).__init__(parent,
-                                           draggerSteps=draggerSteps,
-                                           sliderRange=sliderRange)
+    def __init__(
+        self,
+        custom_signals,
+        parent=None,
+        sliderRange=(-100.0, 100.0),
+        defaultValue=0.0,
+        dencity=1000000,
+        draggerSteps=FLOAT_SLIDER_DRAG_STEPS,
+    ):
+        super(DoubleSlider, self).__init__(
+            parent, draggerSteps=draggerSteps, sliderRange=sliderRange
+        )
         self.isFloat = True
         self._dencity = abs(dencity)
         self.setOrientation(QtCore.Qt.Horizontal)
@@ -588,19 +662,25 @@ class DoubleSlider(slider):
 
     def mapValue(self, inValue):
         # convert slider int value to slider float range value
-        return mapRangeUnclamped(inValue,
-                                 self.minimum(),
-                                 self.maximum(),
-                                 self.sliderRange[0],
-                                 self.sliderRange[1])
+        return mapRangeUnclamped(
+            inValue,
+            self.minimum(),
+            self.maximum(),
+            self.sliderRange[0],
+            self.sliderRange[1],
+        )
 
     def unMapValue(self, outValue):
         # convert mapped float value to slider integer
-        return int(mapRangeUnclamped(outValue,
-                                     self.sliderRange[0],
-                                     self.sliderRange[1],
-                                     self.minimum(),
-                                     self.maximum()))
+        return int(
+            mapRangeUnclamped(
+                outValue,
+                self.sliderRange[0],
+                self.sliderRange[1],
+                self.minimum(),
+                self.maximum(),
+            )
+        )
 
     def onInternalValueChanged(self, x):
         mappedValue = self.mapValue(x)
@@ -617,16 +697,19 @@ class valueBox(QtWidgets.QDoubleSpinBox):
     Extends:
         QtWidgets.QDoubleSpinBox
     """
+
     valueIncremented = QtCore.Signal(object)
 
-    def __init__(self,
-                 labelText="",
-                 type="float",
-                 buttons=False,
-                 decimals=3,
-                 draggerSteps=FLOAT_SLIDER_DRAG_STEPS,
-                 *args,
-                 **kwargs):
+    def __init__(
+        self,
+        labelText="",
+        type="float",
+        buttons=False,
+        decimals=3,
+        draggerSteps=FLOAT_SLIDER_DRAG_STEPS,
+        *args,
+        **kwargs
+    ):
         """
         :param type: Choose if create a float or int spinBox,
             defaults to "float"
@@ -641,7 +724,7 @@ class valueBox(QtWidgets.QDoubleSpinBox):
         :type **kwargs: [type]
         """
         super(valueBox, self).__init__(*args, **kwargs)
-        self.labelFont = QtGui.QFont('Serif', 10, QtGui.QFont.Bold)
+        self.labelFont = QtGui.QFont("Serif", 10, QtGui.QFont.Bold)
         self.labelText = labelText
         self.draggerSteps = copy(draggerSteps)
         self.isFloat = type == "float"
@@ -682,9 +765,9 @@ class valueBox(QtWidgets.QDoubleSpinBox):
         if event.type() == QtCore.QEvent.MouseButtonPress:
             if event.button() == QtCore.Qt.MiddleButton:
                 if self.draggers is None:
-                    self.draggers = draggers(self,
-                                             self.isFloat,
-                                             draggerSteps=self.draggerSteps)
+                    self.draggers = draggers(
+                        self, self.isFloat, draggerSteps=self.draggerSteps
+                    )
                     self.draggers.increment.connect(self.onValueIncremented)
                 self.draggers.show()
                 if self.isFloat:
@@ -692,15 +775,19 @@ class valueBox(QtWidgets.QDoubleSpinBox):
                         self.mapToGlobal(
                             QtCore.QPoint(
                                 event.pos().x() - 1,
-                                event.pos().y() - self.draggers.height() / 2)))
+                                event.pos().y() - self.draggers.height() / 2,
+                            )
+                        )
+                    )
                 else:
                     self.draggers.move(
                         self.mapToGlobal(
                             QtCore.QPoint(
                                 event.pos().x() - 1,
-                                event.pos().y()
-                                - self.draggers.height()
-                                + 15)))
+                                event.pos().y() - self.draggers.height() + 15,
+                            )
+                        )
+                    )
         return False
 
     def update(self):
@@ -716,19 +803,26 @@ class pyf_Slider(QtWidgets.QWidget):
         :valueChanged: Signal emitted when slider or valueBox value changes,
         int/float
     """
+
     valueChanged = QtCore.Signal(object)
     sliderPressed = QtCore.Signal()
     sliderReleased = QtCore.Signal()
 
-    def __init__(self,
-                 parent,
-                 Type="float",
-                 style=0,
-                 name=None,
-                 sliderRange=(-100.0, 100.0),
-                 defaultValue=0.0,
-                 draggerSteps=FLOAT_SLIDER_DRAG_STEPS,
-                 *args):
+    # editingStart = QtCore.Signal()
+    # editingFinished = QtCore.Signal()
+
+    def __init__(
+        self,
+        parent,
+        custom_signals,
+        Type="float",
+        style=0,
+        name=None,
+        sliderRange=(-100.0, 100.0),
+        defaultValue=0.0,
+        draggerSteps=FLOAT_SLIDER_DRAG_STEPS,
+        *args
+    ):
         """
         :param parent: Parent Widget
         :type parent: QtWidgets.QWidget
@@ -754,12 +848,15 @@ class pyf_Slider(QtWidgets.QWidget):
         self.type = Type
 
         if self.type in ATTR_SLIDER_TYPES:
-            self.sld = DoubleSlider(self,
-                                    defaultValue=defaultValue,
-                                    sliderRange=sliderRange,
-                                    draggerSteps=draggerSteps)
+            self.sld = DoubleSlider(
+                self,
+                custom_signals,
+                defaultValue=defaultValue,
+                sliderRange=sliderRange,
+                draggerSteps=draggerSteps,
+            )
         if self.type == "int":
-            self.sld = slider(self, sliderRange=sliderRange)
+            self.sld = slider(self, custom_signals, sliderRange=sliderRange)
         self.sld.valueIncremented.connect(self.incrementValue)
 
         self.input.setRange(sliderRange[0], sliderRange[1])
@@ -804,11 +901,13 @@ class pyf_Slider(QtWidgets.QWidget):
 
     def sliderValueChanged(self, x):
 
-        outValue = mapRangeUnclamped(x,
-                                     float(self.sld.minimum()),
-                                     float(self.sld.maximum()),
-                                     self.input.minimum(),
-                                     self.input.maximum())
+        outValue = mapRangeUnclamped(
+            x,
+            float(self.sld.minimum()),
+            float(self.sld.maximum()),
+            self.input.minimum(),
+            self.input.maximum(),
+        )
         self.input.blockSignals(True)
         self.input.setValue(outValue)
         self.input.blockSignals(False)
@@ -817,11 +916,13 @@ class pyf_Slider(QtWidgets.QWidget):
     def valBoxValueChanged(self, x):
         val = self.input.value()
 
-        sv = mapRangeUnclamped(val,
-                               self.input.minimum(),
-                               self.input.maximum(),
-                               self.sld.minimum(),
-                               self.sld.maximum())
+        sv = mapRangeUnclamped(
+            val,
+            self.input.minimum(),
+            self.input.maximum(),
+            self.sld.minimum(),
+            self.sld.maximum(),
+        )
         self.sld.blockSignals(True)
         self.sld.setValue(int(sv))
         self.sld.blockSignals(False)
@@ -926,23 +1027,19 @@ class pyf_Slider(QtWidgets.QWidget):
         self.input.setSingleStep(step)
 
     def hideLabel(self):
-        """Hides Name label
-        """
+        """Hides Name label"""
         if self.label:
             self.label.hide()
 
     def showLabel(self):
-        """Shows Name label
-        """
+        """Shows Name label"""
         if self.label:
             self.label.show()
 
     def hideSlider(self):
-        """Hides Slider
-        """
+        """Hides Slider"""
         self.sld.hide()
 
     def showSlider(self):
-        """Show Slider
-        """
+        """Show Slider"""
         self.sld.show()

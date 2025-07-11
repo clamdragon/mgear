@@ -1,4 +1,5 @@
-from pymel.core import datatypes
+import ast
+from mgear.pymaya import datatypes
 
 from mgear.shifter import component
 
@@ -36,10 +37,13 @@ class Component(component.Main):
         self.ctl_npo = primitive.addTransform(
             self.root, self.getName("ctl_npo"), t
         )
+        ctl_name = ast.literal_eval(
+            self.settings["ctlNamesDescription_custom"]
+        )[0]
 
         self.ctl = self.addCtl(
             self.ctl_npo,
-            "ctl",
+            ctl_name,
             t,
             self.color_fk,
             "cube",
@@ -75,10 +79,15 @@ class Component(component.Main):
             tp=self.ctl,
         )
 
+        if self.settings["descriptionName"]:
+            jnt_name = self.name
+        else:
+            jnt_name = "0"
+
         self.jnt_pos.append(
             {
                 "obj": self.ctl,
-                "name": self.name,
+                "name": jnt_name,
                 "guide_relative": "root",
             }
         )

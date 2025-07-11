@@ -1,7 +1,7 @@
 """Component Leg 2 joints Free Tangents 01 module"""
 
-import pymel.core as pm
-from pymel.core import datatypes
+import mgear.pymaya as pm
+from mgear.pymaya import datatypes
 
 from mgear.shifter import component
 
@@ -675,7 +675,7 @@ class Component(component.Main):
             "roundness", "Roundness", "double", 0, 0, 1
         )
         self.volume_att = self.addAnimParam(
-            "volume", "Volume", "double", 1, 0, 1
+            "volume", "Volume", "double", 0, 0, 1
         )
         self.tangentVis_att = self.addAnimParam(
             "Tangent_vis", "Tangent vis", "bool", False

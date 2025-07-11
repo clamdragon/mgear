@@ -2,7 +2,7 @@
 import os
 import json
 import sys
-import pymel.core as pm
+import mgear.pymaya as pm
 from mgear import shifter
 from mgear.core import curve
 
@@ -170,13 +170,13 @@ def import_partial_guide(
                         model=rig.guide.model)
 
 
-def import_guide_template(filePath=None, conf=None, *args):
+def import_guide_template(filePath=None, conf=None, **kwargs):
     """Import a guide template
 
     Args:
         filePath (str, optional): Path to the template file to import
     """
-    import_partial_guide(filePath, conf=conf)
+    import_partial_guide(filePath, conf=conf, **kwargs)
 
 
 def build_from_file(filePath=None, conf=False, *args):
@@ -289,5 +289,6 @@ def metahuman_snap():
             for comp in ["arm", "leg"]:
                 try:
                     pm.setAttr("{}_{}0_root.div0".format(comp, side), 0)
+                    pm.setAttr("{}_{}0_root.div1".format(comp, side), 0)
                 except pm.MayaAttributeError:
                     pass

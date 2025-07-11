@@ -1,7 +1,7 @@
 """Guide Control 01 module"""
 
 from functools import partial
-import pymel.core as pm
+import mgear.pymaya as pm
 
 from mgear.shifter.component import guide
 from mgear.core import transform, pyqt, attribute
@@ -15,7 +15,7 @@ from . import settingsUI as sui
 
 # guide info
 AUTHOR = "Jeremie Passerin, Miquel Campos"
-URL = "www.jeremiepasserin.com, www.miquel-campos.com"
+URL = ", www.mcsgear.com"
 EMAIL = ""
 VERSION = [1, 0, 0]
 TYPE = "EPIC_control_01"
@@ -67,9 +67,12 @@ class Guide(guide.ComponentGuide):
         self.pIcon = self.addParam("icon", "string", "cube")
 
         self.pIkRefArray = self.addParam("ikrefarray", "string", "")
+        self.pBackwardsRefJnt  = self.addParam("backwards_ref_jnt", "string", "")
 
         self.pJoint = self.addParam("joint", "bool", False)
-        self.pJoint = self.addParam("uniScale", "bool", False)
+        self.pUniScale = self.addParam("uniScale", "bool", False)
+
+        self.pDescriptionName = self.addParam("descriptionName", "bool", True)
 
         for s in ["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"]:
             self.addParam("k_" + s, "bool", True)
@@ -128,7 +131,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                           'sphere',
                           'square']
 
-        super(self.__class__, self).__init__(parent=parent)
+        super(componentSettings, self).__init__(parent=parent)
         self.settingsTab = settingsTab()
 
         self.setup_componentSettingWindow()
@@ -182,6 +185,9 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.populateCheck(self.settingsTab.sy_checkBox, "k_sy")
         self.populateCheck(self.settingsTab.sz_checkBox, "k_sz")
 
+
+        self.populateCheck(self.settingsTab.descriptionName_checkBox, "descriptionName")
+
         self.settingsTab.ro_comboBox.setCurrentIndex(
             self.root.attr("default_rotorder").get())
 
@@ -203,6 +209,9 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                               "Build will Fail!!")
         comboIndex = self.connector_items.index(currentConnector)
         self.mainSettingsTab.connector_comboBox.setCurrentIndex(comboIndex)
+
+        self.settingsTab.backwards_ref_jnt_lineEdit.setText(
+            self.root.attr("backwards_ref_jnt").get())
 
     def create_componentLayout(self):
 
@@ -279,6 +288,51 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             partial(self.updateConnector,
                     self.mainSettingsTab.connector_comboBox,
                     self.connector_items))
+
+        self.settingsTab.descriptionName_checkBox.stateChanged.connect(
+            partial(
+                self.updateCheck,
+                self.settingsTab.descriptionName_checkBox,
+                "descriptionName",
+            )
+        )
+
+        self.settingsTab.backwards_ref_jnt_pushButton.clicked.connect(
+            partial(self.updateFallbackJoint,
+                    self.settingsTab.backwards_ref_jnt_lineEdit,
+                    "backwards_ref_jnt"))
+
+    def updateFallbackJoint(self, lEdit, targetAttr):
+        """Update line edit with selected joint name if valid.
+
+        This method checks if the selected object is a joint and sets the
+        line edit text and corresponding attribute on the root.
+
+        Args:
+            lEdit (QLineEdit): Line edit widget to populate.
+            targetAttr (str): Attribute name on root to update.
+
+        Returns:
+            None
+        """
+        oSel = pm.selected()
+        if oSel:
+            node = oSel[0]
+            if node == self.root:
+                pm.displayWarning("Root joint cannot be used as fallback.")
+                return
+
+            if pm.nodeType(node) == "joint":
+                lEdit.setText(node.name())
+                self.root.attr(targetAttr).set(lEdit.text())
+            else:
+                pm.displayWarning("Selected element is not a joint.")
+        else:
+            pm.displayWarning("Nothing selected.")
+            if lEdit.text():
+                lEdit.clear()
+                self.root.attr(targetAttr).set("")
+                pm.displayWarning("Fallback joint reference has been cleared.")
 
     def eventFilter(self, sender, event):
         if event.type() == QtCore.QEvent.ChildRemoved:

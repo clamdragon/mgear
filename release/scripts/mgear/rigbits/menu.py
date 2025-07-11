@@ -1,4 +1,4 @@
-import pymel.core as pm
+import mgear.pymaya as pm
 import mgear
 
 from mgear.core import string
@@ -15,6 +15,7 @@ def install():
         ("Add NPO", str_add_NPO),
         ("-----", None),
         (None, gimmick_submenu),
+        # ("Gimmick Setup Tool", str_gimmick_tool),
         ("-----", None),
         ("Mirror Controls Shape", str_mirror_ctls),
         ("Replace Shape", str_replace_shape),
@@ -28,7 +29,7 @@ def install():
         ("-----", None),
         ("Duplicate symmetrical", str_duplicateSym),
         ("-----", None),
-        ("RBF Manager", str_rbf_manager_ui),
+        ("RBF Manager2", str_rbf_manager2_ui),
         ("SDK Manager (BETA)", str_SDK_manager_ui),
         ("-----", None),
         ("Space Manager", str_space_manager),
@@ -37,19 +38,14 @@ def install():
         ("Interpolated Transform", str_createInterpolateTransform),
         (None, connect_submenu),
         ("-----", None),
-        ("Spring", str_spring_UI),
-        ("Rope", str_rope_UI),
-        ("-----", None),
         ("Channel Wrangler", str_openChannelWrangler),
         ("-----", None),
-        ("Facial Rigger", str_facial_rigger),
         ("Eyelid Rigger 2.0", str_eye_rigger),
+        ("Facial Rigger 1.0 (Legacy)", str_facial_rigger),
         ("-----", None),
+        ("Proxy Geo", str_proxyGeo, "mgear_proxyGeo_to_next.svg"),
         ("Proxy Slicer", str_proxySlicer),
         ("Proxy Slicer Parenting", str_proxySlicer_parent),
-        ("-----", None),
-        ("Bake Spring nodes", str_bakeSprings),
-        ("Clear Baked Spring nodes", str_clearSprings),
     )
 
     mgear.menu.install(menuID, commands, image="mgear_rigbits.svg")
@@ -152,6 +148,11 @@ from mgear import rigbits
 rigbits.addNPO()
 """
 
+str_gimmick_tool = """
+from mgear.rigbits.gimmick_tool import main
+main.mainUI()
+"""
+
 str_mirror_ctls = """
 from mgear.rigbits import mirror_controls
 mirror_controls.show()
@@ -182,8 +183,8 @@ from mgear import rigbits
 rigbits.duplicateSym()
 """
 
-str_rbf_manager_ui = """
-from mgear.rigbits import rbf_manager_ui
+str_rbf_manager2_ui = """
+from mgear.rigbits.rbf_manager2 import rbf_manager_ui
 rbf_manager_ui.show()
 """
 
@@ -207,24 +208,14 @@ from mgear import rigbits
 rigbits.createInterpolateTransform()
 """
 
-str_spring_UI = """
-from mgear.rigbits import postSpring
-postSpring.spring_UI()
-"""
-
-str_rope_UI = """
-from mgear.rigbits import rope
-rope.rope_UI()
-"""
-
 str_openChannelWrangler = """
 from mgear.rigbits import channelWrangler
 channelWrangler.openChannelWrangler()
 """
 
-str_facial_rigger = """
-from mgear.rigbits import facial_rigger
-facial_rigger.show()
+str_proxyGeo = """
+from mgear.rigbits import proxyGeo
+proxyGeo.openProxyGeo()
 """
 
 str_proxySlicer = """
@@ -236,18 +227,6 @@ str_proxySlicer_parent = """
 from mgear.rigbits import proxySlicer
 proxySlicer.slice(True)
 """
-
-
-str_bakeSprings = """
-from mgear.core.anim_utils import bakeSprings
-bakeSprings()
-"""
-
-str_clearSprings = """
-from mgear.core.anim_utils import clearSprings
-clearSprings()
-"""
-
 
 # connect str commands
 
@@ -271,6 +250,10 @@ from mgear import rigbits
 rigbits.connectLocalTransform(None, 0, 0, 1)
 """
 
+str_facial_rigger = """
+from mgear.rigbits import facial_rigger
+facial_rigger.show()
+"""
 
 # eye rigger 2.0 str commands
 

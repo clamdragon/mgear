@@ -1,7 +1,7 @@
 """Component Leg 3 joints 01 module"""
 import ast
-import pymel.core as pm
-from pymel.core import datatypes
+import mgear.pymaya as pm
+from mgear.pymaya import datatypes
 
 from mgear.shifter import component
 
@@ -49,6 +49,7 @@ class Component(component.Main):
                 self.negate,
             )
 
+
         self.length0 = vector.getDistance(
             self.guide.apos[0], self.guide.apos[1]
         )
@@ -89,9 +90,13 @@ class Component(component.Main):
             self.guide.apos[0:4],
             self.normal,
             False,
-            self.WIP,
+            True,
         )
         self.legBones[-1].setMatrix(self.foot_t, ws=True)
+
+        if not self.WIP:
+            for b in self.legBones:
+                b.attr("drawStyle").set(2)
 
         # Leg chain FK ref
         self.legBonesFK = primitive.add2DChain(
@@ -561,7 +566,8 @@ class Component(component.Main):
         self.tws3_rot.setAttr("sx", 0.001)
 
         self.tws3_drv = primitive.addTransform(
-            self.legBones[2],
+            # self.legBones[2],
+            self.legBones[3],
             self.getName("tws3_drv"),
             transform.getTransform(self.legBones[3]),
         )
@@ -743,10 +749,13 @@ class Component(component.Main):
         )
 
         self.match_fk3 = self.add_match_ref(
-            self.fk_ctl[3], self.ik_ctl, "fk3_mth"
+            # self.fk_ctl[3], self.ik_ctl, "fk3_mth"
+            self.fk_ctl[3], self.legBonesIK[-1], "fk3_mth"
         )
 
         self.match_ik = self.add_match_ref(self.ik_ctl, self.fk3_ctl, "ik_mth")
+
+        self.match_roll = self.add_match_ref(self.roll_ctl, self.fk2_ctl, "roll_mth")
 
         self.match_ikUpv = self.add_match_ref(
             self.upv_ctl, self.fk0_ctl, "upv_mth"
@@ -1253,7 +1262,7 @@ class Component(component.Main):
 
         for i, x in enumerate(self.fk_ctl[:-1]):
             pm.parentConstraint(x, self.legBonesFK[i], mo=True)
-        # use the ref
+        # use the ref, for bladed foot transforms
         pm.parentConstraint(self.fk_ref, self.legBonesFK[3], mo=True)
 
         for i, x in enumerate([self.chain2bones[0], self.chain2bones[1]]):
@@ -1440,19 +1449,11 @@ class Component(component.Main):
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
-        # self.relatives["root"] = self.legBones[0]
-        # self.relatives["knee"] = self.legBones[1]
-        # self.relatives["ankle"] = self.legBones[2]
-        # self.relatives["foot"] = self.legBones[3]
-        # self.relatives["eff"] = self.legBones[3]
-        # legBones and all children are invisible...
-        knee_index = self.settings["div0"] + 1
-        ankle_index = knee_index + self.settings["div1"] + 1
-        self.relatives["root"] = self.tweak_ctl[0]
-        self.relatives["knee"] = self.tweak_ctl[knee_index]
-        self.relatives["ankle"] = self.tweak_ctl[ankle_index]
-        self.relatives["foot"] = self.div_cns[-1]
-        self.relatives["foot"] = self.end_ref
+        self.relatives["root"] = self.legBones[0]
+        self.relatives["knee"] = self.legBones[1]
+        self.relatives["ankle"] = self.legBones[2]
+        self.relatives["foot"] = self.legBones[3]
+        self.relatives["eff"] = self.legBones[3]
 
         self.controlRelatives["root"] = self.fk0_ctl
         self.controlRelatives["knee"] = self.fk1_ctl

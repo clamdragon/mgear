@@ -1,7 +1,7 @@
 """Functions to create primitives (Non geometry)"""
 
-import pymel.core as pm
-import pymel.core.datatypes as datatypes
+import mgear.pymaya as pm
+import mgear.pymaya.datatypes as datatypes
 
 from mgear.core import transform
 
@@ -50,6 +50,7 @@ def addTransformFromPos(parent, name, pos=datatypes.Vector(0, 0, 0)):
         parent.addChild(node)
 
     return node
+
 
 # ===========================================
 # LOCATOR
@@ -101,6 +102,7 @@ def addLocatorFromPos(parent, name, pos=datatypes.Vector(0, 0, 0), size=1):
         parent.addChild(node)
 
     return node
+
 
 # ===========================================
 # JOINT
@@ -233,7 +235,9 @@ def add2DChain2(parent, name, positions, normal, negate=False, vis=True):
     return chain
 
 
-def add2DChain(parent, name, positions, normal, negate=False, vis=True):
+def add2DChain(
+    parent, name, positions, normal, negate=False, vis=True, axis="xz"
+):
     """Create a 2D joint chain. Like Softimage 2D chain.
 
     Warning:
@@ -262,7 +266,9 @@ def add2DChain(parent, name, positions, normal, negate=False, vis=True):
     if "%s" not in name:
         name += "%s"
 
-    transforms = transform.getChainTransform(positions, normal, negate)
+    transforms = transform.getChainTransform(
+        positions, normal, negate, axis=axis
+    )
     t = transform.setMatrixPosition(transforms[-1], positions[-1])
     transforms.append(t)
 
@@ -274,39 +280,43 @@ def add2DChain(parent, name, positions, normal, negate=False, vis=True):
 
     # moving rotation value to joint orient
     for i, jnt in enumerate(chain):
-        if i == 0:
-            jnt.setAttr("jointOrient", jnt.getAttr("rotate"))
-            jnt.setAttr("rotate", 0, 0, 0)
-        elif i == len(chain) - 1:
-            jnt.setAttr("jointOrient", 0, 0, 0)
-            jnt.setAttr("rotate", 0, 0, 0)
-        else:
-            # This will fail if chain is not always oriented the same
-            # way (like X chain)
-            v0 = positions[i] - positions[i - 1]
-            v1 = positions[i + 1] - positions[i]
-            angle = datatypes.degrees(v0.angle(v1))
-            jnt.setAttr("rotate", 0, 0, 0)
-            jnt.setAttr("jointOrient", 0, 0, angle)
+        pm.makeIdentity(jnt, apply=True, t=0, r=1, s=0, n=0, pn=1)
+
+        # if i == 0:
+        #     jnt.setAttr("jointOrient", jnt.getAttr("rotate"))
+        #     jnt.setAttr("rotate", 0, 0, 0)
+        # elif i == len(chain) - 1:
+        #     jnt.setAttr("jointOrient", 0, 0, 0)
+        #     jnt.setAttr("rotate", 0, 0, 0)
+        # else:
+        #     # This will fail if chain is not always oriented the same
+        #     # way (like X chain)
+        #     v0 = positions[i] - positions[i - 1]
+        #     v1 = positions[i + 1] - positions[i]
+        #     angle = datatypes.degrees(v0.angle(v1))
+        #     jnt.setAttr("rotate", 0, 0, 0)
+        #     jnt.setAttr("jointOrient", 0, 0, angle)
 
         # check if we have to negate Z angle by comparing the guide
         # position and the resulting position.
-        if i >= 1:
-            # round the position values to 6 decimals precission
-            # TODO: test with less precision and new check after apply
-            # Ik solver
-            if ([round(elem, 4) for elem in transform.getTranslation(jnt)]
-                    != [round(elem, 4) for elem in positions[i]]):
+        # if i >= 1:
+        #     # round the position values to 6 decimals precission
+        #     # TODO: test with less precision and new check after apply
+        #     # Ik solver
+        #     if [round(elem, 4) for elem in transform.getTranslation(jnt)] != [
+        #         round(elem, 4) for elem in positions[i]
+        #     ]:
 
-                jp = jnt.getParent()
+        #         jp = jnt.getParent()
 
-                # Aviod intermediate e.g. `transform3` groups that can appear
-                # between joints due to basic moving around.
-                while jp.type() == "transform":
-                    jp = jp.getParent()
+        #         # Aviod intermediate e.g. `transform3` groups that can appear
+        #         # between joints due to basic moving around.
+        #         while jp.type() == "transform":
+        #             jp = jp.getParent()
 
-                jp.setAttr(
-                    "jointOrient", 0, 0, jp.attr("jointOrient").get()[2] * -1)
+        #         jp.setAttr(
+        #             "jointOrient", 0, 0, jp.attr("jointOrient").get()[2] * -1
+        #         )
 
         jnt.setAttr("radius", 1.5)
 
@@ -335,10 +345,12 @@ def addIkHandle(parent, name, chn, solver="ikRPsolver", poleV=None):
 
     """
     # creating a crazy name to avoid name clashing before convert to pyNode.
-    node = pm.ikHandle(n=name + "kjfjfklsdf049r58420582y829h3jnf",
-                       sj=chn[0],
-                       ee=chn[-1],
-                       solver=solver)[0]
+    node = pm.ikHandle(
+        n=name + "kjfjfklsdf049r58420582y829h3jnf",
+        sj=chn[0],
+        ee=chn[-1],
+        solver=solver,
+    )[0]
     node = pm.PyNode(node)
     pm.rename(node, name)
     node.attr("visibility").set(False)

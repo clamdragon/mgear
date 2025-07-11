@@ -1,6 +1,6 @@
-import pymel.core as pm
+import mgear.pymaya as pm
 import ast
-from pymel.core import datatypes
+from mgear.pymaya import datatypes
 
 from mgear.shifter import component
 
@@ -364,6 +364,18 @@ class Component(component.Main):
             attribute.setInvertMirror(self.mid_ctl, ["tx", "ty", "tz"])
 
         # Twist references ---------------------------------
+        x = datatypes.Vector(0, -1, 0)
+        x = x * transform.getTransform(self.eff_loc)
+        if self.settings["use_blade"]:
+            z = self.blade_normal
+        else:
+            z = self.normal
+        z = z * transform.getTransform(self.eff_loc)
+
+        m = transform.getRotationFromAxis(x, z, "xz", self.negate)
+        m = transform.setMatrixPosition(
+            m, transform.getTranslation(self.ik_ctl)
+        )
 
         self.rollRef = primitive.add2DChain(
             self.root,
@@ -511,19 +523,6 @@ class Component(component.Main):
                 twist_idx += increment
 
         # End reference ------------------------------------
-        x = datatypes.Vector(0, -1, 0)
-        x = x * transform.getTransform(self.eff_loc)
-        if self.settings["use_blade"]:
-            z = self.blade_normal
-        else:
-            z = self.normal
-        z = z * transform.getTransform(self.eff_loc)
-
-        m = transform.getRotationFromAxis(x, z, "xz", self.negate)
-        m = transform.setMatrixPosition(
-            m, transform.getTranslation(self.ik_ctl)
-        )
-
         # To help the deformation on the ankle
         self.end_ref = primitive.addTransform(
             self.tws2_rot, self.getName("end_ref"), m
@@ -808,6 +807,7 @@ class Component(component.Main):
         pm.scaleConstraint(self.eff_loc, self.tws2_loc, maintainOffset=False)
         applyop.oriCns(self.bone1, self.tws2_loc, maintainOffset=False)
 
+        # better twisting
         applyop.oriCns(self.tws_ref, self.tws2_rot, maintainOffset=True)
 
         if self.settings["div0"]:

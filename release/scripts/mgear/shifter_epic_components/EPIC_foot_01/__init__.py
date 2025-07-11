@@ -1,6 +1,6 @@
-import pymel.core as pm
+import mgear.pymaya as pm
 import ast
-from pymel.core import datatypes
+from mgear.pymaya import datatypes
 
 from mgear.shifter import component
 
@@ -347,10 +347,10 @@ class Component(component.Main):
 
             if i == 0:  # First
                 inpu = self.roll_att
+                # prevent error in single-div case
                 try:
                     min_input = self.angles_att[i]
                 except IndexError:
-                    # single div case
                     min_input = -360
 
             elif i == len(self.angles_att):  # Last
@@ -428,6 +428,7 @@ class Component(component.Main):
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
 
+        # prevent error in single-div case
         if self.fk_ctl:
             main = self.fk_ctl[0]
         else:
@@ -459,6 +460,7 @@ class Component(component.Main):
         """Add more connection definition to the set"""
 
         self.connections["EPIC_leg_01"] = self.connect_leg_2jnt_01
+        self.connections["EPIC_leg_02"] = self.connect_leg_2jnt_01
         self.connections["leg_2jnt_01"] = self.connect_leg_2jnt_01
         self.connections["leg_ms_2jnt_01"] = self.connect_leg_ms_2jnt_01
         self.connections["leg_3jnt_01"] = self.connect_leg_3jnt_01
@@ -474,9 +476,7 @@ class Component(component.Main):
         pm.parent(self.root, self.parent_comp.ik_ctl)
         pm.parent(self.parent_comp.ik_ref, self.bk_ctl[-1])
         pm.parent(self.parent_comp.match_fk2, self.bk_ctl[-1])
-        pm.parentConstraint(
-            self.parent_comp.tws2_rot, self.fk_ref, maintainOffset=True
-        )
+        pm.parent(self.fk_ref, self.parent_comp.tws2_rot)
 
         # add message connections to parent component.
         # this connection will be used to track the ctl relation when IK/FK
@@ -514,6 +514,12 @@ class Component(component.Main):
         )
         pm.connectAttr(self.parent_comp.blend_att, bc_node.blender)
 
+        # add message connections to parent component.
+        # this connection will be used to track the ctl relation when IK/FK
+        # match is performed
+        self.parent_comp.root.addAttr("footCnx", at="message", m=False)
+        self.root.message >> self.parent_comp.root.footCnx
+
         return
 
     def connect_leg_3jnt_01(self):
@@ -527,8 +533,15 @@ class Component(component.Main):
         pm.parent(self.root, self.parent_comp.ik_ctl)
         pm.parent(self.parent_comp.ik_ref, self.bk_ctl[-1])
         pm.parent(self.parent_comp.ik2b_ikCtl_ref, self.bk_ctl[-1])
+        pm.parent(self.parent_comp.match_fk3, self.bk_ctl[-1])
         pm.parentConstraint(
             self.parent_comp.tws3_rot, self.fk_ref, maintainOffset=True
         )
+
+        # add message connections to parent component.
+        # this connection will be used to track the ctl relation when IK/FK
+        # match is performed
+        self.parent_comp.root.addAttr("footCnx", at="message", m=False)
+        self.root.message >> self.parent_comp.root.footCnx
 
         return

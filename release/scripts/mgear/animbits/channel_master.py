@@ -1,5 +1,5 @@
 import maya.cmds as cmds
-import pymel.core as pm
+import mgear.pymaya as pm
 from mgear.core import pyqt
 from mgear.core import attribute
 from mgear.core import utils
@@ -19,9 +19,12 @@ from . import channel_master_node as cmn
 import importlib
 
 
-class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
+class ChannelMaster(
+    MayaQWidgetDockableMixin, QtWidgets.QDialog, pyqt.SettingsMixin
+):
     def __init__(self, parent=None):
         super(ChannelMaster, self).__init__(parent)
+        pyqt.SettingsMixin.__init__(self)
 
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
 
@@ -39,6 +42,8 @@ class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         self.values_buffer = []
         self.namespace = None
+
+        self.doUpdateHighlightedSliders = True
 
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, 1)
 
@@ -62,6 +67,53 @@ class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
 
         self.add_callback()
 
+        # Usert settings to store
+        # Create the user_settings dictionary with tuples containing the
+        # UI elements and their default values.
+        self.user_settings = {
+            "channelMaster_use_node_namespace_action": (
+                self.use_node_namespace_action,
+                True,
+            ),
+            "channelMaster_use_only_local_data_action": (
+                self.use_only_local_data_action,
+                False,
+            ),
+            "channelMaster_display_sync_graph_action": (
+                self.display_sync_graph_action,
+                False,
+            ),
+            "channelMaster_display_fullname_action": (
+                self.display_fullname_action,
+                False,
+            ),
+            "channelMaster_scrubbing_update_action": (
+                self.scrubbing_update_action,
+                False,
+            ),
+            "channelMaster_key_all_tabs_action": (
+                self.key_all_tabs_action,
+                False,
+            ),
+            "channelMaster_copypaste_all_channels_action": (
+                self.copypaste_all_channels_action,
+                False,
+            ),
+            "channelMaster_key_only_behavior_action": (
+                self.key_only_behavior_action,
+                False,
+            ),
+            "channelMaster_key_delete_reset_only_selected_action": (
+                self.key_delete_reset_only_selected_action,
+                False,
+            ),
+            "channelMaster_display_sync_graph_action": (
+                self.display_sync_graph_action,
+                False,
+            ),
+        }
+        self.load_settings()
+
     def add_callback(self):
         self.cb_manager.selectionChangedCB(
             "Channel_Master_selection_CB", self.selection_change
@@ -70,7 +122,9 @@ class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         #                                   self.time_changed)
 
     def enterEvent(self, evnt):
+        self.doUpdateHighlightedSliders = False
         self.refresh_channels_values()
+        self.doUpdateHighlightedSliders = True
 
     def close(self):
         self.cb_manager.removeAllManagedCB()
@@ -183,6 +237,14 @@ class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.key_paste_action.setShortcut(QtGui.QKeySequence("Ctrl+V"))
         self.key_all_tabs_action = QtWidgets.QAction("Keyframe All Tabs", self)
         self.key_all_tabs_action.setCheckable(True)
+        self.key_only_behavior_action = QtWidgets.QAction(
+            "Key Only (Not Toggle Keyframe)", self
+        )
+        self.key_only_behavior_action.setCheckable(True)
+        self.key_delete_reset_only_selected_action = QtWidgets.QAction(
+            "Key/Delete/Reset Only on Selected", self
+        )
+        self.key_delete_reset_only_selected_action.setCheckable(True)
         self.copypaste_all_channels_action = QtWidgets.QAction(
             "Copy/Paste All Channels", self
         )
@@ -250,6 +312,8 @@ class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.key_menu.addSeparator()
         self.key_menu.addAction(self.key_all_tabs_action)
         self.key_menu.addAction(self.copypaste_all_channels_action)
+        self.key_menu.addAction(self.key_only_behavior_action)
+        self.key_menu.addAction(self.key_delete_reset_only_selected_action)
 
         self.tab_menu = self.menu_bar.addMenu("Tab")
         self.tab_menu.addAction(self.tab_new_action)
@@ -666,7 +730,9 @@ class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         """Refresh the channel values of the current table"""
         table = self.get_current_table()
         if table:
+            self.doUpdateHighlightedSliders = False
             table.refresh_channels_values(current_time)
+            self.doUpdateHighlightedSliders = True
 
     def tab_change(self):
         """Slot triggered when tab change"""
@@ -804,14 +870,33 @@ class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             key_only = True
         else:
             tables = [self.get_current_table()]
-            key_only = False
-
+            key_only = self.key_only_behavior_action.isChecked()
         for table in tables:
             keyed, not_keyed = self.get_key_status(table)
 
+            # filter if selected only
+            if (
+                not_keyed
+                and self.key_delete_reset_only_selected_action.isChecked()
+            ):
+                not_keyed = (
+                    table.get_fullname_from_selected_rows().intersection(
+                        not_keyed
+                    )
+                )
+            if (
+                keyed
+                and self.key_delete_reset_only_selected_action.isChecked()
+            ):
+                keyed = table.get_fullname_from_selected_rows().intersection(
+                    keyed
+                )
+
+            # set / remove keys
             if not_keyed:
                 cmu.set_key(not_keyed)
-            elif not key_only:
+
+            elif not key_only and keyed:
                 cmu.remove_key(keyed)
 
         self.refresh_channels_values()
@@ -824,6 +909,8 @@ class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         """
         table = self.get_current_table()
         keyed, not_keyed = self.get_key_status(table)
+        if keyed and self.key_delete_reset_only_selected_action.isChecked():
+            keyed = table.get_fullname_from_selected_rows().intersection(keyed)
         if keyed:
             cmu.remove_key(keyed)
             self.refresh_channels_values()
@@ -860,9 +947,17 @@ class ChannelMaster(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             *args: Description
         """
         table = self.get_current_table()
+        selected_rows = table.get_fullname_from_selected_rows()
         for i in range(table.rowCount()):
             item = table.item(i, 0)
             attr_config = item.data(QtCore.Qt.UserRole)
+            # is only in selected is active we skip the item if not selected
+            if (
+                selected_rows
+                and self.key_delete_reset_only_selected_action.isChecked()
+            ):
+                if attr_config["fullName"] not in selected_rows:
+                    continue
             cmu.reset_creation_value_attribute(attr_config, self.namespace)
         self.refresh_channels_values()
 

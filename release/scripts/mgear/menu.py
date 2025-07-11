@@ -1,4 +1,5 @@
-import pymel.core as pm
+from maya import cmds
+import mgear.pymaya as pm
 import mgear
 import os
 
@@ -15,8 +16,11 @@ def create(menuId=menuId):
         str: main manu name
     """
 
-    if pm.menu(menuId, exists=True):
-        pm.deleteUI(menuId)
+    if cmds.menu(menuId, exists=True):
+        try:
+            pm.deleteUI(menuId)
+        except RuntimeError:
+            pm.displayInfo("Tried to delete {}, but it was not found".format(menuId))
 
     project_name = os.environ.get("MGEAR_PROJECT_NAME", None)
     if project_name:
@@ -117,10 +121,6 @@ def install_main_menu():
     import mgear
     mgear.install()
 
-    # Install Dag Menu option
-    import mgear.core.dagmenu
-    mgear.core.dagmenu.install()
-
     # Install Shifter Menu
     import mgear.shifter.menu
     mgear.shifter.menu.install()
@@ -157,10 +157,6 @@ def install_main_menu():
     import mgear.anim_picker.menu
     mgear.anim_picker.menu.install()
 
-    # Install Synoptic Menu
-    import mgear.synoptic.menu
-    mgear.synoptic.menu.install()
-
     # Install Flex Menu
     import mgear.flex.menu
     mgear.flex.menu.install()
@@ -178,6 +174,10 @@ def install_main_menu():
     # Install Help Menu
     mgear.menu.install_help_menu()
 
+    # Install Dag Menu option
+    import mgear.core.dagmenu
+    mgear.core.dagmenu.install()
+
     # from cvwrap.menu import create_menuitems
     # create_menuitems()
 
@@ -194,7 +194,7 @@ webbrowser.open("http://forum.mgear-framework.com/")
 
 str_docs = """
 import webbrowser
-webbrowser.open("https://www.mgear-framework.com/mgear_dist/")
+webbrowser.open("https://mgear4.readthedocs.io/en/latest/")
 """
 
 str_about = """

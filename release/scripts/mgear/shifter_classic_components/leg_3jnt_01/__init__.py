@@ -1,7 +1,7 @@
 """Component Leg 3 joints 01 module"""
 
-import pymel.core as pm
-from pymel.core import datatypes
+import mgear.pymaya as pm
+from mgear.pymaya import datatypes
 
 from mgear.shifter import component
 
@@ -71,8 +71,11 @@ class Component(component.Main):
             self.guide.apos[0:4],
             self.normal,
             False,
-            self.WIP,
+            True,
         )
+        if not self.WIP:
+            for b in self.legBones:
+                b.attr("drawStyle").set(2)
 
         # Leg chain FK ref
         self.legBonesFK = primitive.add2DChain(
@@ -531,7 +534,7 @@ class Component(component.Main):
         self.tws3_rot.setAttr("sx", 0.001)
 
         self.tws3_drv = primitive.addTransform(
-            self.legBones[2],
+            self.legBones[3],
             self.getName("tws3_drv"),
             transform.getTransform(self.legBones[3]),
         )
@@ -577,7 +580,28 @@ class Component(component.Main):
             self.getName("end_ref"),
             transform.getTransform(self.legBones[3]),
         )
-        self.jnt_pos.append([self.end_ref, "end"])
+
+        for a in "xyz":
+            self.end_ref.attr("s%s" % a).set(1.0)
+        if self.negate:
+            self.end_ref.attr("ry").set(-180.0)
+
+        t = transform.getTransform(self.end_ref)
+        pos = self.guide.pos["ankle"]
+        pos[1] = 0
+        self.squash_npo = primitive.addTransformFromPos(
+            self.end_ref, self.getName("squashEnd_npo"), pos
+        )
+        self.squash_scl = primitive.addTransformFromPos(
+            self.squash_npo, self.getName("squashEnd_scl"), pos
+        )
+        self.squash_ref = primitive.addTransform(
+            self.squash_scl,
+            self.getName("squash_ref"),
+            transform.getTransform(self.legBones[3]),
+        )
+
+        self.jnt_pos.append([self.squash_ref, "end"])
 
         # match IK FK references
         self.match_fk0_off = self.add_match_ref(
@@ -605,10 +629,11 @@ class Component(component.Main):
         )
 
         self.match_fk3 = self.add_match_ref(
-            self.fk_ctl[3], self.ik_ctl, "fk3_mth"
+            self.fk_ctl[3], self.legBonesIK[-1], "fk3_mth"
         )
 
         self.match_ik = self.add_match_ref(self.ik_ctl, self.fk3_ctl, "ik_mth")
+        self.match_roll = self.add_match_ref(self.roll_ctl, self.fk2_ctl, "roll_mth")
 
         self.match_ikUpv = self.add_match_ref(
             self.upv_ctl, self.fk0_ctl, "upv_mth"
@@ -714,6 +739,10 @@ class Component(component.Main):
 
         self.tweakVis_att = self.addAnimParam(
             "Tweak_vis", "Tweak Vis", "bool", False
+        )
+
+        self.foot_squash_att = self.addAnimParam(
+            "footSquash", "Foot Squash", "double", 1, 0.01, 1.9
         )
 
         # Setup ------------------------------------------
@@ -837,9 +866,15 @@ class Component(component.Main):
             self.softblendLoc,
             self.getName("ik3BonesHandle"),
             self.chain3bones,
-            self.ikSolver,
+            "ikRPsolver",
             self.upv_ctl,
         )
+        # we connect the ik spring solver after tu avoid flip issue that may
+        # happend with the IKSprin solver
+        if self.ikSolver == "ikSpringSolver":
+            pm.connectAttr(
+                "ikSpringSolver.message", self.ikHandle.ikSolver, force=True
+            )
 
         # TwistTest
         if [
@@ -1286,7 +1321,13 @@ class Component(component.Main):
         pm.parentConstraint(self.legBones[1], self.match_fk1_off, mo=True)
         pm.parentConstraint(self.legBones[2], self.match_fk2_off, mo=True)
 
-        return
+        # squash foot
+        self.foot_squash_att >> self.squash_scl.sx
+        self.foot_squash_att >> self.squash_scl.sz
+        rev_nod = node.createReverseNode(self.foot_squash_att)
+        add_node = node.createPlusMinusAverage1D(
+            [rev_nod.outputX, 1], output=self.squash_scl.sy
+        )
 
     # =====================================================
     # CONNECTOR
@@ -1308,7 +1349,9 @@ class Component(component.Main):
 
         self.jointRelatives["root"] = 0
         self.jointRelatives["knee"] = self.settings["div0"] + 2
-        self.jointRelatives["ankle"] = len(self.div_cns) - 1
+        self.jointRelatives["ankle"] = (
+            self.settings["div0"] + self.settings["div1"] + 2
+        )
         self.jointRelatives["foot"] = len(self.div_cns)
         self.jointRelatives["eff"] = len(self.div_cns)
 

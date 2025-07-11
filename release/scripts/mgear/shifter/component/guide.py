@@ -7,15 +7,15 @@ from functools import partial
 import maya.cmds as cmds
 
 # pyMel
-import pymel.core as pm
-from pymel.core import datatypes
+import mgear.pymaya as pm
+from mgear.pymaya import datatypes
 
 # mgear
 import mgear
 
 from mgear.core import string
 from mgear.core import node
-from pymel import versions
+from mgear.pymaya import versions
 
 from mgear.core import dag, vector, transform, applyop, attribute, icon, pyqt
 
@@ -33,6 +33,8 @@ JOINT_NAME_DESCRIPTION = "jointNamesDescription"
 JOINT_NAME_DESCRIPTION_CUSTOM = JOINT_NAME_DESCRIPTION + "_custom"
 CTL_NAME_DESCRIPTION = "ctlNamesDescription"
 CTL_NAME_DESCRIPTION_CUSTOM = CTL_NAME_DESCRIPTION + "_custom"
+ALIAS_NAME_DESCRIPTION = "aliasNamesDescription"
+ALIAS_NAME_DESCRIPTION_CUSTOM = ALIAS_NAME_DESCRIPTION + "_custom"
 
 ##########################################################
 # COMPONENT GUIDE
@@ -83,6 +85,7 @@ class ComponentGuide(guide.Main):
     compatible = []
     joint_names_description = []
     ctl_names_description = []
+    alias_names_description = []
     ctl_grp = ""
 
     # ====================================================
@@ -189,6 +192,14 @@ class ComponentGuide(guide.Main):
             )
             self.pCtlNamesDescription_custom = self.addParam(
                 CTL_NAME_DESCRIPTION_CUSTOM, "string", str(self.ctl_names_description)
+            )
+
+        if self.alias_names_description:
+            self.pAliasNamesDescription = self.addParam(
+                ALIAS_NAME_DESCRIPTION, "string", str(self.alias_names_description)
+            )
+            self.pAliasNamesDescription_custom = self.addParam(
+                ALIAS_NAME_DESCRIPTION_CUSTOM, "string", str(self.alias_names_description)
             )
         self.pJointRotOffX = self.addParam(
             "joint_rot_offset_x", "double", 0.0, -360.0, 360.0
@@ -699,7 +710,7 @@ class ComponentGuide(guide.Main):
         self.connect_x_ray(loc)
         pm.delete(add_ref_joint)
 
-    def addLoc(self, name, parent, position=None):
+    def addLoc(self, name, parent, position=None, color=17, width=.5):
         """Add a loc object to the guide.
 
         This mehod can initialize the object or draw it.
@@ -721,11 +732,19 @@ class ComponentGuide(guide.Main):
             # this functionality is not implemented. The actual design from
             # softimage Gear should be review to fit in Maya.
             loc = self.prim[name].create(
-                parent, self.getName(name), self.tra[name], color=17
+                parent,
+                self.getName(name),
+                self.tra[name],
+                color=color,
+                width=width
             )
         else:
             loc = icon.guideLocatorIcon(
-                parent, self.getName(name), color=17, m=self.tra[name]
+                parent,
+                self.getName(name),
+                color=color,
+                m=self.tra[name],
+                width=width
             )
         self.connect_x_ray(loc)
         return loc
@@ -774,7 +793,7 @@ class ComponentGuide(guide.Main):
             i += 1
         return locs
 
-    def addBlade(self, name, parentPos, parentDir):
+    def addBlade(self, name, parentPos, parentDir, wUp=None):
         """Add a blade object to the guide.
 
         This mehod can initialize the object or draw it.
@@ -784,9 +803,10 @@ class ComponentGuide(guide.Main):
             name (str): Local name of the element.
             parentPos (dagNode): The parent of the element.
             parentDir (dagNode): The direction constraint of the element.
+            wUp (dagNode, optional): world up node. If None will be self.root
 
         Returns:
-            dagNode:  The created blade curve.
+            dagNode: The created blade curve.
 
         """
         if name not in self.blades.keys():
@@ -796,6 +816,9 @@ class ComponentGuide(guide.Main):
             offset = False
         else:
             offset = True
+
+        if not wUp:
+            wUp = self.root
 
         blade = icon.guideBladeIcon(
             parent=parentPos,
@@ -810,7 +833,7 @@ class ComponentGuide(guide.Main):
             axis="xy",
             wupType=2,
             wupVector=[0, 1, 0],
-            wupObject=self.root,
+            wupObject=wUp,
             maintainOffset=offset,
         )
         pnt_cns = pm.pointConstraint(parentPos, blade)
@@ -1187,6 +1210,23 @@ class CtlNameDescriptor(NameDescriptor):
         self.create_layouts()
 
 
+class AliasNameDescriptor(NameDescriptor):
+    def __init__(self, parent=None):
+        super(AliasNameDescriptor, self).__init__()
+
+        self.root = pm.selected()[0]
+        self.d_names = self.root.attr(ALIAS_NAME_DESCRIPTION).get()
+        self.d_names = ast.literal_eval(self.d_names)
+        self.descriptor_name_custom = ALIAS_NAME_DESCRIPTION_CUSTOM
+        self.d_custom_names = self.root.attr(self.descriptor_name_custom).get()
+        self.d_custom_names = ast.literal_eval(self.d_custom_names)
+
+        self.setWindowTitle("Space Alias Name Descriptor")
+
+        self.create_widgets()
+        self.create_layouts()
+
+
 class componentMainSettings(QtWidgets.QDialog, guide.helperSlots):
     valueChanged = QtCore.Signal(int)
 
@@ -1201,6 +1241,8 @@ class componentMainSettings(QtWidgets.QDialog, guide.helperSlots):
             self.jointNameDescriptor = jointNameDescriptor()
         if self.root.hasAttr(CTL_NAME_DESCRIPTION):
             self.CtlNameDescriptor = CtlNameDescriptor()
+        if self.root.hasAttr(ALIAS_NAME_DESCRIPTION):
+            self.AliasNameDescriptor = AliasNameDescriptor()
 
         self.create_controls()
         self.populate_controls()
@@ -1303,7 +1345,7 @@ class componentMainSettings(QtWidgets.QDialog, guide.helperSlots):
             (w for i in index_widgets for w in i[:2]),
             (w for i in rgb_widgets for w in i[:2]),
             "Use_RGB_Color",
-            tab.useRGB_checkBox.checkState(),
+            tab.useRGB_checkBox.isChecked(),
         )
 
         self.refresh_controls()
@@ -1318,6 +1360,12 @@ class componentMainSettings(QtWidgets.QDialog, guide.helperSlots):
         if self.root.hasAttr(CTL_NAME_DESCRIPTION):
             self.tabs.insertTab(
                 ctl_tab, self.CtlNameDescriptor, "Ctl Description Names"
+            )
+            ctl_tab += 1
+        # alias names tab
+        if self.root.hasAttr(ALIAS_NAME_DESCRIPTION):
+            self.tabs.insertTab(
+                ctl_tab, self.AliasNameDescriptor, "Space Alias Description Names"
             )
 
     def refresh_controls(self):
