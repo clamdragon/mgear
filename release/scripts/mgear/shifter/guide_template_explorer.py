@@ -118,7 +118,8 @@ class GuideTemplateExplorer(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         if template:
             indx = self.gteUIInst.explorer_treeView.selectedIndexes()[0]
             try:
-                if indx.parent().internalPointer().key == "components_list":
+                par = indx.parent().internalPointer().key
+                if par == "components_list":
                     part = indx.internalPointer().value
                     oSel = pm.selected()
                     if oSel and oSel[0].getParent(-1).hasAttr("ismodel"):
@@ -128,6 +129,12 @@ class GuideTemplateExplorer(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                     io.import_partial_guide(
                         partial=part, initParent=initParent, conf=template
                     )
+                elif par == "guide_root":
+                    item = indx.internalPointer()
+                    if item.key == "param_values":
+                        guide_template.match_params(
+                            data=template["guide_root"]["param_values"]
+                        )
                 else:
                     pm.displayWarning(
                         "Please select a component guide to "
@@ -136,7 +143,7 @@ class GuideTemplateExplorer(MayaQWidgetDockableMixin, QtWidgets.QDialog):
             except AttributeError:
                 pm.displayWarning(
                     "Please select a component guide to import"
-                    " from components_list"
+                    " from components_list!"
                 )
         else:
             pm.displayWarning("Not guide template load")

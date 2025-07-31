@@ -1,7 +1,9 @@
 import json
+import logging
 
 import mgear.pymaya as pm
 from mgear.shifter import guide
+from pymel.core.general import MayaAttributeError
 
 
 def updateGuide(*args):
@@ -564,6 +566,34 @@ def dict_diff(dictA, dictB):
             not_found_key.append(k)
 
     return not_found_key, not_match_value
+
+
+def match_params(data):
+    try:
+        guide = pm.selected()[0]
+        assert guide.hasAttr("ismodel")
+    except:
+        pm.displayWarning("Select guide node to xfer params onto")
+        return
+    else:
+        skip = [
+            "date",
+            "user",
+            "ismodel",
+            "maya_version",
+            "gear_version"
+        ]
+
+        for k, v in data.items():
+            if k in skip:
+                continue
+            try:
+                pm.setAttr("{}.{}".format(guide, k), v)
+            except (pm.MayaAttributeError, RuntimeError):
+                pm.displayWarning(
+                    "Guide attribute not found :: {}".format(k))
+
+        logging.info("Transferred guide params!")
 
 
 def truncate_tra_dict_values(tra_dict):
