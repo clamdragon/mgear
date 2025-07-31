@@ -218,7 +218,11 @@ def import_sample_template(name, *args):
 def metahuman_snap():
     """Snap and configure metahuman guide to attach to metahuman _drv skeleton
     """
-    if pm.ls("root_drv"):
+
+    # new (>=5.6) metahuman scene structure...
+    # just looking for "root" could false positive for anything
+    new_mh_root = pm.ls("rig|joints_grp|root")
+    if pm.ls("root_drv") or new_mh_root:
         spine = [[u'root_C0_root', u'root_drv'],
                  [u'body_C0_root', u'pelvis_drv'],
                  [u'spine_C0_spineBase', u'spine_01_drv'],
@@ -268,11 +272,17 @@ def metahuman_snap():
             try:
                 a = loc[0]
                 b = loc[1]
+                if new_mh_root:
+                    b = b.replace("_drv", "")
                 match(a, b)
 
                 if "_l_" in b:
                     ar = a.replace("_L", "_R")
                     br = b.replace("_l_", "_r_")
+                    match(ar, br)
+                elif b.endswith("_l"):
+                    ar = a.replace("_L", "_R")
+                    br = b[:-1] + "r"
                     match(ar, br)
             except pm.MayaNodeError:
                 pm.displayWarning(
