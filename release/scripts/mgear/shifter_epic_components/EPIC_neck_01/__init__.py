@@ -1,5 +1,5 @@
 import mgear.pymaya as pm
-from mgear.pymaya import datatypes, nodetypes
+from mgear.pymaya import datatypes
 
 from mgear.shifter import component
 import ast
@@ -48,13 +48,15 @@ class Component(component.Main):
         }
         # default was YX so just make a matrix replacing those axes with aim/bend
         ctrl_rot_offset = datatypes.EulerRotation.decompose(
-            datatypes.Matrix(
-                axis_vectors[bend_axis],
-                axis_vectors[aim_axis],
-                axis_vectors[normal_axis],
-                datatypes.Vector()
+            transform.setMatrixRotation(
+                datatypes.Matrix(), [
+                    axis_vectors[bend_axis],
+                    axis_vectors[aim_axis],
+                    axis_vectors[normal_axis],
+                ]
             ),
-            "XYZ"
+            # "XYZ"
+            0
         )
 
         self.normal = self.guide.blades["blade"].z * -1
@@ -575,9 +577,9 @@ class Component(component.Main):
             cns = applyop.pathCns(
                 self.div_cns[i], self.slv_crv, False, u, True, True
             )
-            cns.setAttr("frontAxis", aim_axis.upper()[-1])  # bone axis
+            cns.setAttr("frontAxis", axes.index(aim_axis[-1]))  # bone axis
             cns.setAttr("inverseFront", "-" in aim_axis)
-            cns.setAttr("upAxis", bend_axis.upper()[-1]) # bend axis
+            cns.setAttr("upAxis", axes.index(bend_axis[-1])) # bend axis
             cns.setAttr("inverseUp", "-" in bend_axis)
 
             # Roll
@@ -624,17 +626,26 @@ class Component(component.Main):
             mtx_cns_node = applyop.gear_matrix_cns(self.div_cns[i], self.fk_npo[i])
             mtx_cns_node.drivenRestMatrix.set(datatypes.Matrix())
             if i == 0:
-                # fk0 doesn't need scale inversion, that is all taken care of at the root
-                pass
+                if self.settings.get("invert_parent_scale"):
+                    pass
+                else:
+                    pm.disconnectAttr(mtx_cns_node.scale, self.fk_npo[i].scale)
+
+                    pm.connectAttr(
+                        self.root.worldInverseMatrix,
+                        mtx_cns_node.drivenParentInverseMatrix,
+                        force=True
+                    )
             else:
-                par_ctl = self.fk_ctl[i - 1]
-                inv_scl_node = node.createDivNode(
-                    [1, 1, 1],
-                    [par_ctl.sx, par_ctl.sy, par_ctl.sz]
-                )
-                pm.connectAttr(inv_scl_node.output, mtx_cns_node.drivenInverseScale)
+                # fk0 doesn't need scale inversion, that is all taken care of at the root
+                # if self.options["force_SSC"]:
+                if self.settings.get("invert_parent_scale"):
+                    applyop.invert_parent_scale(mtx_cns_node, self.fk_ctl[i-1])
+                else:
+                    pm.disconnectAttr(mtx_cns_node.scale, self.fk_npo[i].scale)
+
                 pm.connectAttr(
-                    self.div_cns[i - 1].worldInverseMatrix,
+                    self.div_cns[i-1].worldInverseMatrix,
                     mtx_cns_node.drivenParentInverseMatrix,
                     force=True
                 )
@@ -660,7 +671,8 @@ class Component(component.Main):
                     blend_node + ".output", self.div_cns[i] + ".rotate"
                 )
 
-            if self.options["force_SSC"]:
+            # if self.options["force_SSC"]:
+            if self.settings.get("invert_parent_scale"):
                 op.global_scale.disconnect()
                 op.global_scale.set(1, 1, 1)
 
@@ -712,23 +724,8 @@ class Component(component.Main):
 
         self.parent.addChild(self.root)
 
-        if self.options["force_SSC"]:
-            # finally, something that functions identically to SSC
-            # ssc_mtx_cns = applyop.gear_matrix_cns(self.root.m)
-            ssc_mtx_cns = nodetypes.Mgear_matrixConstraint()
-            # don't want PIM connected, it can all be local
-            ssc_mtx_cns.driverMatrix.set(self.root.m.get())
-            # connect *all*
-            ssc_mtx_cns.translate >> self.root.t
-            ssc_mtx_cns.rotate >> self.root.r
-            ssc_mtx_cns.scale >> self.root.s
-            ssc_mtx_cns.shear >> self.root.sh
-            # inverted parent scale
-            root_scl_inv = pm.nt.MultiplyDivide()
-            root_scl_inv.operation.set(2)
-            root_scl_inv.input1.set(1, 1, 1)
-            self.parent.scale >> root_scl_inv.input2
-            root_scl_inv.o >> ssc_mtx_cns.drivenInverseScale
+        # if self.options["force_SSC"]:
+        #     applyop.invert_parent_scale(self.root, self.parent)
 
         if self.settings["chickenStyleIK"]:
             skipTranslate = "none"

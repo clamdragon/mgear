@@ -41,13 +41,14 @@ class Component(component.Main):
         }
         # default was YX so just make a matrix replacing those axes with aim/bend
         ctrl_rot_offset = datatypes.EulerRotation.decompose(
-            datatypes.Matrix(
-                axis_vectors[bend_axis],
-                axis_vectors[aim_axis],
-                axis_vectors[normal_axis],
-                datatypes.Vector()
+            transform.setMatrixRotation(
+                datatypes.Matrix(), [
+                    axis_vectors[bend_axis],
+                    axis_vectors[aim_axis],
+                    axis_vectors[normal_axis],
+                ]
             ),
-            "XYZ"
+            datatypes.EulerRotation.kXYZ
         )
 
         self.normal = self.guide.blades["blade"].z * -1
@@ -485,6 +486,7 @@ class Component(component.Main):
         self.chest_npo = primitive.addTransform(
             self.scl_transforms[-1], self.getName("chest_npo"), t
         )
+
         self.chest_ctl = self.addCtl(
             self.chest_npo,
             "chest",
@@ -494,6 +496,7 @@ class Component(component.Main):
             w=self.size,
             h=self.size * 0.05,
             d=self.size,
+            ro=ctrl_rot_offset,
             tp=self.preiviousCtlTag,
         )
 
@@ -756,9 +759,9 @@ class Component(component.Main):
                 self.div_cns[i], self.slv_crv, cnsType, u_param, True
             )
 
-            cns.setAttr("frontAxis", aim_axis.upper()[-1])  # bone axis
+            cns.setAttr("frontAxis", axes.index(aim_axis[-1]))  # bone axis
             cns.setAttr("inverseFront", "-" in aim_axis)
-            cns.setAttr("upAxis", bend_axis.upper()[-1]) # bend axis
+            cns.setAttr("upAxis", axes.index(bend_axis[-1])) # bend axis
             cns.setAttr("inverseUp", "-" in bend_axis)
 
             # Roll
@@ -779,15 +782,20 @@ class Component(component.Main):
                 self.ref_twist[i] + ".translate", cns + ".worldUpVector"
             )
 
-            # compensate scale reference
-            div_node = node.createDivNode(
-                [1, 1, 1],
-                [
-                    rootWorld_node + ".outputScaleX",
-                    rootWorld_node + ".outputScaleY",
-                    rootWorld_node + ".outputScaleZ",
-                ],
-            )
+            if self.settings.get("invert_parent_scale"):
+                extra_scl_comp = None
+            else:
+                # compensate scale reference
+                div_node = node.createDivNode(
+                    [1, 1, 1],
+                    [
+                        rootWorld_node + ".outputScaleX",
+                        rootWorld_node + ".outputScaleY",
+                        rootWorld_node + ".outputScaleZ",
+                    ],
+                )
+
+                extra_scl_comp = div_node.output
 
             # Squash n Stretch
             op = applyop.gear_squashstretch2_op(
@@ -795,7 +803,7 @@ class Component(component.Main):
                 self.root,
                 pm.arclen(self.slv_crv),
                 aim_axis,
-                div_node + ".output",
+                extra_scl_comp,
             )
 
             pm.connectAttr(self.volume_att, op + ".blend")
@@ -803,38 +811,48 @@ class Component(component.Main):
             pm.connectAttr(self.st_att[i], op + ".stretch")
             pm.connectAttr(self.sq_att[i], op + ".squash")
 
-            # Controlers
-            if i == 0:
-                mulmat_node = applyop.gear_mulmatrix_op(
-                    self.div_cns[i].attr("worldMatrix"),
-                    self.root.attr("worldInverseMatrix"),
-                )
 
-                dm_node = node.createDecomposeMatrixNode(
-                    mulmat_node + ".output"
-                )
+            # Controlers
+            # ik drive fk
+            mtx_cns_node = applyop.gear_matrix_cns(self.div_cns[i], self.fk_npo[i])
+            mtx_cns_node.drivenRestMatrix.set(datatypes.Matrix())
+            if i == 0:
+                if self.settings.get("invert_parent_scale"):
+                    pass
+                else:
+                    pm.disconnectAttr(mtx_cns_node.scale, self.fk_npo[i].scale)
+
+                    pm.connectAttr(
+                        self.root.worldInverseMatrix,
+                        mtx_cns_node.drivenParentInverseMatrix,
+                        force=True
+                    )
+            else:
+                # fk0 doesn't need scale inversion, that is all taken care of at the root
+                # if self.options["force_SSC"]:
+                if self.settings.get("invert_parent_scale"):
+                    applyop.invert_parent_scale(mtx_cns_node, self.fk_ctl[i-1])
+                else:
+                    pm.disconnectAttr(mtx_cns_node.scale, self.fk_npo[i].scale)
+                    # I guess
+                    mtx_cns_node.translate.disconnect(self.fk_npo[i].translate)
+                    node.createMulNode(
+                        div_node.output,
+                        mtx_cns_node.translate,
+                        [self.fk_npo[i].tx, self.fk_npo[i].ty, self.fk_npo[i].tz]
+                    )
 
                 pm.connectAttr(
-                    dm_node + ".outputTranslate", self.fk_npo[i].attr("t")
+                    self.div_cns[i-1].worldInverseMatrix,
+                    mtx_cns_node.drivenParentInverseMatrix,
+                    force=True
                 )
 
-            else:
-                mulmat_node = applyop.gear_mulmatrix_op(
-                    self.div_cns[i].attr("worldMatrix"),
-                    self.div_cns[i - 1].attr("worldInverseMatrix"),
-                )
 
-                dm_node = node.createDecomposeMatrixNode(
-                    mulmat_node + ".output"
-                )
-
-                mul_node = node.createMulNode(
-                    div_node + ".output", dm_node + ".outputTranslate"
-                )
-
-                pm.connectAttr(mul_node + ".output", self.fk_npo[i].attr("t"))
-
-            pm.connectAttr(dm_node + ".outputRotate", self.fk_npo[i].attr("r"))
+            # if self.options["force_SSC"]:
+            # if self.settings.get("invert_parent_scale"):
+            #     op.global_scale.disconnect()
+            #     op.global_scale.set(1, 1, 1)
 
             # Orientation Lock
             if i == 0:
@@ -844,7 +862,8 @@ class Component(component.Main):
 
                 # fk ctrl in ik ctrl space gives the offset we need to align them
                 mm_node = node.createMultMatrixNode(
-                    fk_t * ik_t.inverse(), self.ik0_ctl + ".worldMatrix"
+                    fk_t * ik_t.inverse(),
+                    self.ik0_ctl + ".worldMatrix"
                 )
                 dm_node = node.createDecomposeMatrixNode(mm_node + ".matrixSum")
 
@@ -866,8 +885,10 @@ class Component(component.Main):
                 fk_t = transform.getTransform(self.div_cns[i])
 
                 # fk ctrl in ik ctrl space gives the offset we need to align them
-                mm_node = node.createMultMatrixNode(fk_t * ik_t.inverse(),
-                                                    self.ik1_ctl + ".worldMatrix")
+                mm_node = node.createMultMatrixNode(
+                    fk_t * ik_t.inverse(),
+                    self.ik1_ctl + ".worldMatrix"
+                )
                 dm_node = node.createDecomposeMatrixNode(mm_node + ".matrixSum")
 
                 blend_node = node.createBlendNode(
@@ -920,3 +941,12 @@ class Component(component.Main):
 
         self.aliasRelatives["root"] = "pelvis"
         self.aliasRelatives["chest"] = "chest"
+
+    def finalize(self):
+        super(Component, self).finalize()
+        if self.settings.get("invert_parent_scale"):
+            self.root.translate.disconnect()
+            self.root.rotate.disconnect()
+            self.root.scale.disconnect()
+            self.root.shear.disconnect()
+            applyop.toggle_ssc(self.jointList[0], False)

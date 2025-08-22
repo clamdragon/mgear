@@ -176,6 +176,7 @@ class ComponentGuide(guide.Main):
         self.pConnector = self.addParam("connector", "string", "standard")
         self.pUIHost = self.addParam("ui_host", "string", "")
         self.pCtlGroup = self.addParam("ctlGrp", "string", "")
+        self.pInvParScale = self.addParam("invert_parent_scale", "bool", False)
         self.pJointNames = self.addParam("joint_names", "string", "")
         if self.joint_names_description:
             self.pJointNamesDescription = self.addParam(

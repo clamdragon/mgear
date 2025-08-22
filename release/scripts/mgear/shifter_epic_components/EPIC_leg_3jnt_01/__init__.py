@@ -283,6 +283,10 @@ class Component(component.Main):
         attribute.setKeyableAttributes(self.fk3_ctl)
 
         self.fk_ctl = [self.fk0_ctl, self.fk1_ctl, self.fk2_ctl, self.fk3_ctl]
+        if self.settings.get("invert_parent_scale"):
+            applyop.invert_parent_scale(self.fk1_npo, self.fk0_ctl)
+            applyop.invert_parent_scale(self.fk2_npo, self.fk1_ctl)
+            applyop.invert_parent_scale(self.fk3_npo, self.fk2_ctl)
 
         for x in self.fk_ctl:
             attribute.setInvertMirror(x, ["tx", "ty", "tz"])

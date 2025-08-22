@@ -416,6 +416,65 @@ def gear_matrix_cns(
     return node
 
 
+def invert_parent_scale(child, parent, parent_root=None):
+    """
+    finally, something that functions identically to SSC
+    but is for the control hierarchy
+    :return: 
+    """
+    if isinstance(child, pm.nt.Mgear_matrixConstraint):
+        ssc_mtx_cns = child
+    else:
+        ssc_mtx_cns = pm.nt.Mgear_matrixConstraint()
+        # don't want PIM connected, it can all be local
+        ssc_mtx_cns.driverMatrix.set(child.m.get())
+
+        # connect *all*
+        ssc_mtx_cns.translate >> child.t
+        ssc_mtx_cns.rotate >> child.r
+        ssc_mtx_cns.scale >> child.s
+        ssc_mtx_cns.shear >> child.sh
+
+
+    root_scl_inv = pm.createNode("multiplyDivide")
+    root_scl_inv.operation.set(2)
+    root_scl_inv.input1.set(1, 1, 1)
+
+    if parent_root:
+        mm = pm.createNode("multMatrix")
+        parent.wm >> mm.i[0]
+        parent_root.wim >> mm.i[1]
+
+        dm = pm.createNode("decomposeMatrix")
+        mm.matrixSum >> dm.inputMatrix
+        dm.outputScale >> root_scl_inv.input2
+    else:
+        parent.scale >> root_scl_inv.input2
+
+    root_scl_inv.o >> ssc_mtx_cns.drivenInverseScale
+
+    return ssc_mtx_cns
+
+
+def toggle_ssc(jnt, state):
+    if isinstance(jnt, str):
+        jnt = pm.PyNode(jnt)
+
+    try:
+        mtx_cns = jnt.inputs(type="mgear_matrixConstraint")[0]
+    except KeyError:
+        pm.displayWarning("Unable to toggle SSC due to unfound mtx cns :: ".format(jnt.name()))
+        return
+
+    if state:
+        # turn on
+        jnt.ssc.set(True)
+        jnt.inverseScale >> mtx_cns.drivenInverseScale
+    else:
+        jnt.ssc.set(False)
+        jnt.inverseScale.disconnect(mtx_cns.drivenInverseScale)
+
+
 def gear_spring_op(in_obj, goal=False, solver="mgear_springNode"):
     """Apply mGear spring node.
 

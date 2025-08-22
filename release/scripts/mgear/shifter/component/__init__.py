@@ -1,7 +1,7 @@
 """
 Shifter component rig class.
 """
-
+import logging
 #############################################
 # GLOBAL
 #############################################
@@ -410,6 +410,7 @@ class Main(object):
         # force SSC override
         if self.options["force_SSC"]:
             segComp = True
+        segCompComponent = self.settings.get("invert_parent_scale", False) and segComp
 
         if not rot_off:
             rot_off = [
@@ -459,7 +460,7 @@ class Main(object):
             # for example Mehahuman twist joint already have connections
             if not attribute.has_in_connections(jnt):
                 # Disconnect inversScale for better preformance
-                if isinstance(self.active_jnt, pm.nodetypes.Joint):
+                if not segCompComponent and isinstance(self.active_jnt, pm.nodetypes.Joint):
                     try:
                         pm.disconnectAttr(
                             self.active_jnt.scale, jnt.inverseScale
@@ -498,23 +499,6 @@ class Main(object):
                         driver = obj
                         rot_off = rot_off
 
-                if driver:
-                    if segComp:
-                        # if segment compensation is active we handle the scale
-                        # outside of the gear matrix contraint
-                        srt = "rt"
-                        mulmat_node = node.createMultMatrixNode(
-                            driver.worldMatrix, self.root.worldInverseMatrix
-                        )
-                        # joint rot offset needs to be taken into account for scale
-                        if rot_off != [0, 0, 0]:
-                            mulmat_node = node.createMultMatrixNode(
-                                datatypes.EulerRotation(rot_off).asMatrix(),
-                                mulmat_node.matrixSum
-                            )
-                        dm_node = node.createDecomposeMatrixNode(
-                            mulmat_node.matrixSum
-                        )
 
                 if use_cns_connection and self.options["connect_joints"]:
                     # coonnect jnt to driver using parent contraint and scale
@@ -528,16 +512,42 @@ class Main(object):
                     cns_m = None
 
                 elif driver:
-                    # if segComp:
-                    #     # if segment compensation is active we handle the scale
-                    #     # outside of the gear matrix contraint
-                    #     srt = "rt"
+                    if self.options["joint_worldOri"]:
+                        driver = primitive.addTransformFromPos(
+                            driver,
+                            name=obj.name() + "_world_ori",
+                            pos=transform.getTranslation(driver),
+                        )
+
+                    cns_m = applyop.gear_matrix_cns(
+                        driver,
+                        jnt,
+                        rot_off=rot_off,
+                        connect_srt="srt"
+                    )
+
+                    if segComp:
+                        # with global segcomp, it's mostly just important to disable shear
+                        # leave the individual joint setup stuff for per component
+                        jnt.shear.disconnect()
+                        if segCompComponent:
+                            jnt.inverseScale >> cns_m.drivenInverseScale
+                        # if segment compensation is active we handle the scale
+                        # outside of the gear matrix contraint
+                    #
                     #     mulmat_node = node.createMultMatrixNode(
                     #         driver.worldMatrix, self.root.worldInverseMatrix
                     #     )
+                    #     # joint rot offset needs to be taken into account for scale
+                    #     if rot_off != [0, 0, 0]:
+                    #         mulmat_node = node.createMultMatrixNode(
+                    #             datatypes.EulerRotation(rot_off).asMatrix(),
+                    #             mulmat_node.matrixSum
+                    #         )
                     #     dm_node = node.createDecomposeMatrixNode(
                     #         mulmat_node.matrixSum
                     #     )
+                    #
                     #     # check if there is negative scaling and compensate
                     #     invert_scale = []
                     #     for v in dm_node.outputScale.get():
@@ -560,24 +570,24 @@ class Main(object):
                     #         srt = "t"
                     #     else:
                     #         pm.connectAttr(dm_node.outputScale, jnt.s)
-
+                    #
+                    #     cns_m = applyop.gear_matrix_cns(
+                    #         driver,
+                    #         jnt,
+                    #         rot_off=rot_off,
+                    #         connect_srt="rt"
+                    #     )
+                    #
+                    #     if segCompComponent:
+                    #         jnt.inverseScale >> cns_m.drivenInverseScale
+                    #
                     # else:
-                    #     srt = "srt"
-                    # cns_m = applyop.gear_matrix_cns(
-                    #     driver, jnt, rot_off=rot_off, connect_srt=srt
-                    # )
-                    if self.options["joint_worldOri"]:
-                        driver = primitive.addTransformFromPos(
-                            driver,
-                            name=obj.name() + "_world_ori",
-                            pos=transform.getTranslation(driver),
-                        )
-
-                    cns_m = applyop.gear_matrix_cns(
-                        driver, jnt, rot_off=rot_off, connect_srt="srt"
-                    )
-                    if segComp:
-                        pm.connectAttr(jnt.inverseScale, cns_m.drivenInverseScale)
+                    #     cns_m = applyop.gear_matrix_cns(
+                    #         driver,
+                    #         jnt,
+                    #         rot_off=rot_off,
+                    #         connect_srt="srt"
+                    #     )
 
                     # # if negative scaling we need to invert rotation directions
                     # # in X and Y after the constraint matrix is created
@@ -652,7 +662,7 @@ class Main(object):
                 # Segment scale compensate on/Off
                 # TODO: before was always off to avoid issues with the
                 # global scale. Confirm there is no conflicts
-                jnt.setAttr("segmentScaleCompensate", segComp)
+                jnt.setAttr("segmentScaleCompensate", segCompComponent)
 
                 if not keep_off and neutral_rot:
                     # setting the joint orient compensation in order to
@@ -1729,8 +1739,17 @@ class Main(object):
             parent_name = self.guide.parentComponent.getName(
                 self.guide.parentLocalName
             )
-        self.parent = self.rig.findRelative(parent_name)
+
         self.parent_comp = self.rig.findComponent(parent_name)
+        if self.settings["useIndex"]:
+            i = self.settings["parentJointIndex"]
+            try:
+                self.parent = self.parent_comp.jnt_pos[i]["obj"]
+            except:
+                pm.displayWarning("Failed to reparent component controls to custom index :: {}".format(self.name))
+                self.parent = self.rig.findRelative(parent_name)
+        else:
+            self.parent = self.rig.findRelative(parent_name)
 
     def connect(self):
         """Connect the component
@@ -1739,7 +1758,6 @@ class Main(object):
         connection.
 
         """
-
         if self.settings["connector"] not in self.connections.keys():
             # mgear.log("Unable to connect object", mgear.sev_error)
             # return False
@@ -1750,6 +1768,10 @@ class Main(object):
             self.settings["connector"] = "standard"
         try:
             self.connections[self.settings["connector"]]()
+            if self.options["force_SSC"] and self.settings.get("invert_parent_scale", False):
+                # segcomp
+                applyop.invert_parent_scale(self.root, self.parent, self.parent_comp.root)
+                # self.connect_to_ssc_connect()
             return True
         except AttributeError:
             return False
