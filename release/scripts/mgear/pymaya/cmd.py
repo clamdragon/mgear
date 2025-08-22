@@ -172,13 +172,18 @@ def _obj_to_name(arg):
         return arg.toStringList()
     elif isinstance(arg, base.Base):
         return arg.name()
+    elif hasattr(arg, "name"):
+        if isinstance(arg.name, str):
+            return arg.name
+        elif callable(arg.name):
+            return arg.name()
     return arg
 
 
 def _dt_to_value(arg):
     if isinstance(arg, (list, set, tuple)):
         return arg.__class__([_dt_to_value(x) for x in arg])
-    elif isinstance(arg, datatypes.Vector):
+    elif isinstance(arg, (datatypes.Vector, datatypes.EulerRotation)):
         return [arg[0], arg[1], arg[2]]
     elif isinstance(arg, datatypes.Point):
         return [arg[0], arg[1], arg[2], arg[3]]
@@ -273,7 +278,8 @@ def _pymaya_cmd_wrap(func, wrap_object=True, scope=SCOPE_NODE):
         # Constraints
         if (
             func.__name__.endswith("Constraint")
-            and "query" not in kwargs.keys()
+            and "query" not in kwargs
+            and "q" not in kwargs
         ):
             res = res[0] if res else None
 
@@ -367,17 +373,58 @@ def setAttr(*args, **kwargs):
             else:
                 fargs.append(arg)
 
-        if (
-            len(fargs) == 2
-            and isinstance(fargs[1], str)
-            and "typ" not in kwargs
-            and "type" not in kwargs
-        ):
-            kwargs["type"] = "string"
+        if "type" not in kwargs and "typ" not in kwargs:
+            if len(fargs) == 2 and isinstance(fargs[1], str):
+                kwargs["type"] = "string"
+            elif len(fargs) == 2 and isinstance(fargs[1], OpenMaya.MMatrix):
+                kwargs["type"] = "matrix"
+            elif len(fargs) == 17 and all(isinstance(n, float) for n in fargs[1:]):
+                kwargs["type"] = "matrix"
 
         cmds.setAttr(*fargs, **kwargs)
     except Exception as e:
         raise exception.MayaAttributeError(*e.args)
+
+
+def addAttr(*args, **kwargs):
+    """
+    Enable more pythonic type inputs
+    :param args:
+    :param kwargs:
+    :return:
+    """
+    args = _obj_to_name(args)
+    kwargs = _obj_to_name(kwargs)
+
+    attr_type = kwargs.pop("at", None) or kwargs.pop("attributeType", None)
+    if attr_type:
+        if attr_type == bool:
+            kwargs["attributeType"] = "bool"
+        elif attr_type == int:
+            kwargs["attributeType"] = "long"
+        elif attr_type == float:
+            kwargs["attributeType"] = "double"
+        else:
+            kwargs["attributeType"] = attr_type
+
+    data_type = kwargs.pop("dt", None) or kwargs.pop("dataType", None)
+    if data_type:
+        if data_type == str:
+            kwargs["dataType"] = "string"
+        else:
+            kwargs["dataType"] = data_type
+
+    try:
+        cmds.addAttr(*args, **kwargs)
+    except Exception as e:
+        raise exception.MayaAttributeError(*e.args)
+
+
+def listAttr(obj, **kwargs):
+    obj = _obj_to_name(obj)
+    res = cmds.listAttr(obj, **kwargs)
+
+    return _name_to_obj(res, scope=SCOPE_ATTR, known_node=obj) or []
 
 
 def currentTime(*args, **kwargs):
@@ -800,6 +847,38 @@ def select(*args, **kwargs):
     """Wrapper for cmds.select() that supports nested lists."""
     args = _flatten_list(args)
     return _name_to_obj(cmds.select(*args, **kwargs))
+
+
+def _arg_order(a):
+    """cmds needs args in a specific (stupid) order,
+    which pymel sometimes made more flexible.
+    Attempt to make flexible here."""
+    if isinstance(a, (float, int)):
+        return 0
+    elif isinstance(a, (list, tuple)):
+        return 1
+    elif isinstance(a, (bind.base.Node, str)):
+        return 2
+    else:
+        return 3
+
+
+def rotate(*args, **kwargs):
+    """Fix the arg order"""
+    args = sorted(args, key=lambda e: _arg_order(e))
+    cmds.rotate(*args, **kwargs)
+
+
+def move(*args, **kwargs):
+    """Fix the arg order"""
+    args = sorted(args, key=lambda e: _arg_order(e))
+    cmds.move(*args, **kwargs)
+
+
+def scale(*args, **kwargs):
+    """Fix the arg order"""
+    args = sorted(args, key=lambda e: _arg_order(e))
+    cmds.scale(*args, **kwargs)
 
 
 # set Locals dict

@@ -93,6 +93,10 @@ def _getParent(node, generations=1):
             return BindNode("|" + "|".join(splt[:-generations]))
 
 
+def _setParent(node, parent, **kwargs):
+    _addChild(parent, node, **kwargs)
+
+
 def _getChildren(node, **kwargs):
     kwargs["c"] = True
     if "fullPath" not in kwargs:
@@ -118,25 +122,20 @@ def _getMatrix(node, **kwargs):
     return datatypes.Matrix(cmd.xform(node, **kwargs))
 
 
-def _getTranslation(node, space="object"):
-    space = util.to_mspace(space)
+def _getTranslation(node, **kwargs):
+    space = util.getSpaceArg(**kwargs)
     return datatypes.Vector(
         OpenMaya.MFnTransform(node.dagPath()).translation(space)
     )
 
 
-def _setTranslation(node, value, space="object", **kwargs):
-    if kwargs.pop("worldSpace", kwargs.pop("ws", False)):
-        space = "world"
-    elif kwargs.pop("objectSpace", kwargs.pop("os", False)):
-        space = "object"
-
-    space = util.to_mspace(space)
+def _setTranslation(node, value, **kwargs):
+    space = util.getSpaceArg(**kwargs)
     OpenMaya.MFnTransform(node.dagPath()).setTranslation(value, space)
 
 
-def _getRotation(node, space="object", quaternion=False, **kwargs):
-    space = util.to_mspace(space)
+def _getRotation(node, quaternion=False, **kwargs):
+    space = util.getSpaceArg(**kwargs)
     res = OpenMaya.MFnTransform(node.dagPath()).rotation(
         space=space, asQuaternion=True
     )
@@ -144,11 +143,13 @@ def _getRotation(node, space="object", quaternion=False, **kwargs):
     if quaternion:
         return datatypes.Quaternion(res)
     else:
-        return datatypes.EulerRotation(res.asEulerRotation())
+        return datatypes.degrees(
+            datatypes.EulerRotation(res.asEulerRotation())
+        )
 
 
-def _setRotation(node, rotation, space="object"):
-    if isinstance(rotation, list):
+def _setRotation(node, rotation, **kwargs):
+    if isinstance(rotation, (list, tuple)):
         if len(rotation) == 3:
             rotation = datatypes.EulerRotation(
                 *[math.radians(x) for x in rotation]
@@ -159,7 +160,7 @@ def _setRotation(node, rotation, space="object"):
     if isinstance(rotation, OpenMaya.MEulerRotation):
         rotation = rotation.asQuaternion()
 
-    space = util.to_mspace(space)
+    space = util.getSpaceArg(**kwargs)
     OpenMaya.MFnTransform(node.dagPath()).setRotation(rotation, space)
 
 
@@ -206,12 +207,18 @@ class _Node(base.Node):
     def __hash__(self):
         return hash(self.name())
 
-    def __init__(self, nodename_or_mobject):
+    def __init__(self, nodename_or_mobject=None):
         super(_Node, self).__init__()
         self.__attrs = {}
         self.__api_mfn = None
 
-        if isinstance(nodename_or_mobject, OpenMaya.MObject):
+        if nodename_or_mobject is None:
+            name = self.__class__.__name__
+            name = name[0].lower() + name[1:]
+            dgm = OpenMaya.MDGModifier()
+            self.__obj = dgm.createNode(name)
+            dgm.doIt()
+        elif isinstance(nodename_or_mobject, OpenMaya.MObject):
             self.__obj = nodename_or_mobject
         else:
             self.__obj = _Node.__getObjectFromName(nodename_or_mobject)
@@ -234,6 +241,7 @@ class _Node(base.Node):
             self.__dagpath = dagpath
             self.__fn_dag = OpenMaya.MFnDagNode(dagpath)
             self.getParent = partial(_getParent, self)
+            self.setParent = partial(_setParent, self)
             self.getChildren = partial(_getChildren, self)
             self.addChild = partial(_addChild, self)
             if self.__obj.hasFn(OpenMaya.MFn.kTransform):
@@ -511,7 +519,7 @@ class _Node(base.Node):
         return cmds.objExists("{}.{}".format(self.name(), name))
 
     def listAttr(self, **kwargs):
-        return cmd.listAttr(**kwargs)
+        return cmd.listAttr(self.name(), **kwargs)
 
     def disconnectAttr(self, attr_name):
         # Construct the full attribute name
@@ -556,6 +564,24 @@ class _Node(base.Node):
             return list(zip(connections[::2], connections[1::2]))
 
         return connections
+
+    def inputs(self, **kwargs):
+        """
+        Convenience and compatibility.
+        it's used all over the place in old pymel post-scripts and stuff.
+        :param kwargs: any additional inputs args, "plugs", etc
+        :return:
+        """
+        return self.listConnections(source=True, destination=False, **kwargs)
+
+    def outputs(self, **kwargs):
+        """
+        Convenience and compatibility.
+        it's used all over the place in old pymel post-scripts and stuff.
+        :param kwargs: any additional inputs args, "plugs", etc
+        :return:
+        """
+        return self.listConnections(source=False, destination=True, **kwargs)
 
     def listRelatives(self, **kwargs):
         # ensure we use fullpath to avoid name clashing with maya.cmds
@@ -606,6 +632,7 @@ class _Node(base.Node):
         Returns:
             list: A list of instances representing the history nodes.
         """
+        type_filter = kwargs.pop("type", kwargs.pop("exactType", None))
         # Get the history nodes using cmds.listHistory() with the provided
         # kwargs
         history = cmds.listHistory(self.name(), **kwargs)
@@ -619,6 +646,8 @@ class _Node(base.Node):
         history_instances = []
         for hist_node in history:
             node_type = cmds.nodeType(hist_node)
+            if type_filter and not node_type == type_filter:
+                continue
             node_class = node_types.getTypeClass(node_type)
             if node_class:
                 history_instances.append(node_class(hist_node))

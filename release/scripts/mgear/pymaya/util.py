@@ -7,14 +7,42 @@ import math
 
 def degrees(*args):
     if isinstance(args[0], OpenMaya.MEulerRotation):
-        return args[0].__class__(
-            math.degrees(args[0].x),
-            math.degrees(args[0].y),
-            math.degrees(args[0].z),
+        # an actual om.MEulerRotation with degrees for xyz values is invalid
+        # and leads to faulty math
+        # so this is only for a pymaya.dt.EulerRotation
+        try:
+            res = args[0].__class__(
+                math.degrees(args[0].x),
+                math.degrees(args[0].y),
+                math.degrees(args[0].z),
+                args[0].order,
+                unit="degrees"
+            )
+        except ValueError:
+            res = args[0]
+
+    elif isinstance(args[0], (list, tuple)):
+        res = [math.degrees(e) for e in args[0]]
+    else:
+        res = math.degrees(*args)
+
+    return res
+
+
+def radians(*args):
+    if isinstance(args[0], OpenMaya.MEulerRotation):
+        res = args[0].__class__(
+            math.radians(args[0].x),
+            math.radians(args[0].y),
+            math.radians(args[0].z),
             args[0].order,
         )
+    elif isinstance(args[0], (list, tuple)):
+        res = [math.radians(e) for e in args[0]]
+    else:
+        res = math.radians(*args)
 
-    return math.degrees(*args)
+    return res
 
 
 class UndoChunk(object):
@@ -71,6 +99,24 @@ def to_mspace(space, as_api2=True):
             return om.MSpace.kObject
 
         return om.MSpace.kInvalid
+
+
+def getSpaceArg(**kwargs):
+    """
+    Catch multiple ways of passing space arguments, return as correct MSpace
+    :param kwargs:
+    :return:
+    """
+    if "space" in kwargs:
+        space = kwargs.pop("space")
+    elif kwargs.pop("worldSpace", kwargs.pop("ws", False)):
+        space = "world"
+    elif kwargs.pop("objectSpace", kwargs.pop("os", False)):
+        space = "object"
+    else:
+        space = "object"
+
+    return to_mspace(space)
 
 
 def cross(a, b):

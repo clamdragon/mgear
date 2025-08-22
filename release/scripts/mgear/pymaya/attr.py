@@ -80,6 +80,17 @@ class Attribute(base.Attr):
     def __rshift__(self, other):
         return self.connect(other, f=True)
 
+    def  __iter__(self):
+        """
+        Without this, iteration over array plugs goes infinite
+        :return:
+        """
+        if self.__plug.isArray:
+            for i in self.__plug.getExistingArrayAttributeIndices():
+                yield self[i]
+        else:
+            raise TypeError("{} is not an array plug".format(self.name()))
+
     def plug(self):
         return self.__plug
 
@@ -157,7 +168,7 @@ class Attribute(base.Attr):
         force = kwargs.get("f", False)
         return cmds.connectAttr(
             self.name(),
-            other.name() if isinstance(other, Attribute) else other,
+            other.name() if hasattr(other, "name") else other,
             force=force,
         )
 
@@ -285,6 +296,16 @@ class Attribute(base.Attr):
                 res[ev] = fn.fieldValue(ev)
 
         return res
+
+    def setEnums(self, enums):
+        attr = self.plug().attribute()
+        if not attr.hasFn(OpenMaya.MFn.kEnumAttribute):
+            raise Exception("{} is not an enum attribute".format(self.name()))
+
+        if not all(isinstance(e, str) for e in enums):
+            raise TypeError("Expected list of strings for new enum names.")
+
+        cmd.addAttr(self.name(), edit=True, enumName=":".join(enums))
 
     def getMin(self):
         if cmd.attributeQuery(self.longName(), node=self.node(), mne=True):

@@ -1,22 +1,51 @@
 import math
+import types
 from maya.api import OpenMaya
 from . import util
+from .util import degrees
 
+
+class Const():
+    def __init__(self, data):
+        self.data = data
+
+    def __get__(self, obj, par_cls):
+        return par_cls(self.data)
+
+    def __set__(self, *args):
+        raise AttributeError("Cannot set a constant!")
 
 degrees = util.degrees
+radians = util.radians
 Space = OpenMaya.MSpace
 
+pymel_om_kwarg_map = {
+    "tol": "tolerance",
+}
 
 def _warp_dt(func):
     def wrapper(*args, **kwargs):
+        # do a bit of kwarg adjusting
+        for a, b in pymel_om_kwarg_map.items():
+            val = kwargs.pop(a, None)
+            if val:
+                kwargs[b] = val
+
         res = func(*args, **kwargs)
-        if isinstance(res, OpenMaya.MVector):
+        # isinstance also catches subclasses, essentially just duplicating
+        # the already correct result. we ONLY want API classes.
+        # if isinstance(res, OpenMaya.MVector):
+        if type(res) is OpenMaya.MVector:
             return Vector(res)
-        elif isinstance(res, OpenMaya.MPoint):
+        elif type(res) is OpenMaya.MPoint:
             return Point(res)
-        elif isinstance(res, OpenMaya.MMatrix):
+        elif type(res) is OpenMaya.MEulerRotation:
+            return EulerRotation(res)
+        elif type(res) is OpenMaya.MMatrix:
             return Matrix(res)
-        elif isinstance(res, OpenMaya.MTransformationMatrix):
+        elif type(res) is OpenMaya.MQuaternion:
+            return Quaternion(res)
+        elif type(res) is OpenMaya.MTransformationMatrix:
             return TransformationMatrix(res.asMatrix())
         else:
             return res
@@ -24,13 +53,29 @@ def _warp_dt(func):
     return wrapper
 
 
+
+
+
+
 class Vector(OpenMaya.MVector):
     WRAP_FUNCS = []
+    l = locals()
     for fn in dir(OpenMaya.MVector):
         if not fn.startswith("_"):
             f = getattr(OpenMaya.MVector, fn)
             if callable(f):
-                WRAP_FUNCS.append(fn)
+                # class and static methods
+                if isinstance(f, types.BuiltinFunctionType):
+                    l[fn] = _warp_dt(f)
+                else:
+                    WRAP_FUNCS.append(fn)
+
+    xAxis = Const(OpenMaya.MVector.kXaxisVector)
+    xNegAxis = Const(OpenMaya.MVector.kXnegAxisVector)
+    yAxis = Const(OpenMaya.MVector.kYaxisVector)
+    yNegAxis = Const(OpenMaya.MVector.kYnegAxisVector)
+    zAxis = Const(OpenMaya.MVector.kZaxisVector)
+    zNegAxis = Const(OpenMaya.MVector.kZnegAxisVector)
 
     def __init__(self, *args, **kwargs):
         if len(args) == 1:
@@ -72,6 +117,9 @@ class Vector(OpenMaya.MVector):
     def __neg__(self):
         """Override negation to return a Vector."""
         return Vector(super(Vector, self).__neg__())
+
+    def __repr__(self):
+        return "Vector({})".format(self.tolist())
 
     def tolist(self):
         return [self.x, self.y, self.z]
@@ -116,11 +164,16 @@ class Vector(OpenMaya.MVector):
 
 class Point(OpenMaya.MPoint):
     WRAP_FUNCS = []
+    l = locals()
     for fn in dir(OpenMaya.MPoint):
         if not fn.startswith("_"):
             f = getattr(OpenMaya.MPoint, fn)
             if callable(f):
-                WRAP_FUNCS.append(fn)
+                # class and static methods
+                if isinstance(f, types.BuiltinFunctionType):
+                    l[fn] = _warp_dt(f)
+                else:
+                    WRAP_FUNCS.append(fn)
 
     def __init__(self, *args, **kwargs):
         super(Point, self).__init__(*args, **kwargs)
@@ -138,26 +191,35 @@ class Point(OpenMaya.MPoint):
     def __getitem__(self, item):
         return [self.x, self.y, self.z, self.w][item]
 
+    def __repr__(self):
+        return "Point({})".format(self.tolist())
+
 
 class Matrix(OpenMaya.MMatrix):
     WRAP_FUNCS = []
+    l = locals()
     for fn in dir(OpenMaya.MMatrix):
         if not fn.startswith("_"):
             f = getattr(OpenMaya.MMatrix, fn)
             if callable(f):
-                WRAP_FUNCS.append(fn)
+                # class and static methods
+                if isinstance(f, types.BuiltinFunctionType):
+                    l[fn] = _warp_dt(f)
+                else:
+                    WRAP_FUNCS.append(fn)
 
     def __init__(self, *args, **kwargs):
         if len(args) == 16:
             args = (args,)
-        super(Matrix, self).__init__(*args, **kwargs)
+        self.base = super(Matrix, self)
+        self.base.__init__(*args, **kwargs)
         for fn in Matrix.WRAP_FUNCS:
             setattr(
-                self, fn, _warp_dt(super(Matrix, self).__getattribute__(fn))
+                self, fn, _warp_dt(self.base.__getattribute__(fn))
             )
 
     def get(self):
-        gt = super(Matrix, self).__getitem__
+        gt = self.base.__getitem__
         return (
             (gt(0), gt(1), gt(2), gt(3)),
             (gt(4), gt(5), gt(6), gt(7)),
@@ -173,13 +235,13 @@ class Matrix(OpenMaya.MMatrix):
             raise Exception("over 4 values given")
 
         for i, v in enumerate(value):
-            super(Matrix, self).__setitem__(index * 4 + i, v)
+            self.base.__setitem__(index * 4 + i, v)
 
     def __getitem__(self, index):
         if index < 0 or index > 3:
             raise Exception("list index out of range")
 
-        gt = super(Matrix, self).__getitem__
+        gt = self.base.__getitem__
         return [
             gt(index * 4),
             gt(index * 4 + 1),
@@ -187,9 +249,66 @@ class Matrix(OpenMaya.MMatrix):
             gt(index * 4 + 3),
         ]
 
+    def __mul__(self, other):
+        return Matrix(self.base.__mul__(other))
+
+    def __imul__(self, other):
+        return Matrix(self.base.__imul__(other))
+
+    def __rmul__(self, other):
+        return Matrix(self.base.__rmul__(other))
+
+    def __repr__(self):
+        return "Matrix({})".format([self[0], self[1], self[2], self[3]])
+
     @property
     def translate(self):
-        return TransformationMatrix(self).getTranslation(Space.kTransform)
+        return Vector(self[3][0:3])
+
+    @translate.setter
+    def translate(self, value):
+        self[3] = value
+
+    @property
+    def rotate(self):
+        q = Quaternion()
+        q.setValue(self)
+        return q
+
+    @rotate.setter
+    def rotate(self, value):
+        scale = self.scale
+        # euler? meh pymel dosn't, so pass
+        # if len(value) == 3
+        if len(value) == 4:
+            m = OpenMaya.MQuaternion(value).asMatrix()
+        elif isinstance(value, OpenMaya.MQuaternion):
+            m = value.asMatrix()
+        else:
+            raise ValueError("Must set rotation with a quaternion or 4 numbers [i, j, k, l]")
+
+        self[0] = [m[0] * scale[0], m[1] * scale[0], m[2] * scale[0], 0]
+        self[1] = [m[4] * scale[1], m[5] * scale[1], m[6] * scale[1], 0]
+        self[2] = [m[8] * scale[2], m[9] * scale[2], m[10] * scale[2], 0]
+
+    @property
+    def scale(self):
+        v = Vector()
+        for i in range(3):
+            v[i] = math.sqrt(sum( [math.pow(e, 2) for e in self[i]] ))
+        return v
+
+    @scale.setter
+    def scale(self, value):
+        if not len(value) == 3:
+            raise ValueError("Must set scale using three values")
+
+        for i, s in enumerate(value):
+            v = self[i]
+            curr = math.sqrt(sum(math.pow(vc, 2) for vc in v))
+            mult = s / curr
+            self[i] = [vc * mult for vc in v]
+
 
 
 def _trnsfrommatrix_wrp(func, this):
@@ -204,11 +323,16 @@ def _trnsfrommatrix_wrp(func, this):
 class TransformationMatrix(Matrix):
     WRAP_FUNCS = []
     ORG_MEMS = []
+    l = locals()
     for fn in dir(OpenMaya.MTransformationMatrix):
         if not fn.startswith("_"):
             f = getattr(OpenMaya.MTransformationMatrix, fn)
             if callable(f):
-                WRAP_FUNCS.append(fn)
+                # class and static methods
+                if isinstance(f, types.BuiltinFunctionType):
+                    l[fn] = _warp_dt(f)
+                else:
+                    WRAP_FUNCS.append(fn)
 
     def __init__(self, *args, **kwargs):
         super(TransformationMatrix, self).__init__(*args, **kwargs)
@@ -282,11 +406,16 @@ class TransformationMatrix(Matrix):
 
 class BoundingBox(OpenMaya.MBoundingBox):
     WRAP_FUNCS = []
+    l = locals()
     for fn in dir(OpenMaya.MBoundingBox):
         if not fn.startswith("_"):
             f = getattr(OpenMaya.MBoundingBox, fn)
             if callable(f):
-                WRAP_FUNCS.append(fn)
+                # class and static methods
+                if isinstance(f, types.BuiltinFunctionType):
+                    l[fn] = _warp_dt(f)
+                else:
+                    WRAP_FUNCS.append(fn)
 
     def __init__(self, *args, **kwargs):
         nargs = []
@@ -314,11 +443,16 @@ class BoundingBox(OpenMaya.MBoundingBox):
 
 class Quaternion(OpenMaya.MQuaternion):
     WRAP_FUNCS = []
+    l = locals()
     for fn in dir(OpenMaya.MQuaternion):
         if not fn.startswith("_"):
             f = getattr(OpenMaya.MQuaternion, fn)
             if callable(f):
-                WRAP_FUNCS.append(fn)
+                # class and static methods
+                if isinstance(f, types.BuiltinFunctionType):
+                    l[fn] = _warp_dt(f)
+                else:
+                    WRAP_FUNCS.append(fn)
 
     def __init__(self, *args, **kwargs):
         super(Quaternion, self).__init__(*args, **kwargs)
@@ -335,17 +469,49 @@ class Quaternion(OpenMaya.MQuaternion):
             self.x * scal, self.y * scal, self.z * scal, self.w * scal
         )
 
+    def __repr__(self):
+        return "Quaternion({})".format([self.x, self.y, self.z, self.w])
+
 
 class EulerRotation(OpenMaya.MEulerRotation):
     WRAP_FUNCS = []
+    l = locals()
     for fn in dir(OpenMaya.MEulerRotation):
         if not fn.startswith("_"):
             f = getattr(OpenMaya.MEulerRotation, fn)
             if callable(f):
-                WRAP_FUNCS.append(fn)
+                # class and static methods attach to class,
+                # so in __init__ is not good enough
+                if isinstance(f, types.BuiltinFunctionType):
+                    l[fn] = _warp_dt(f)
+                else:
+                    WRAP_FUNCS.append(fn)
 
     def __init__(self, *args, **kwargs):
-        super(EulerRotation, self).__init__(*args, **kwargs)
+        # uiu = OpenMaya.MAngle.uiUnit()
+        if args and isinstance(args[0], EulerRotation):
+            unit = args[0].unit
+        else:
+            # alright, a lot has been rewritten to use radians
+            # so I guess that should be the default
+            unit = "radians"
+        # elif isinstance(args[0], OpenMaya.MEulerRotation):
+        #     unit = "radians"
+        # elif uiu == 2:
+        #     unit = "degrees"
+        # else:
+        #     unit = "radians"
+
+        self._unit = kwargs.pop("unit", unit)
+
+        self.base = super(EulerRotation, self)
+        self.base.__init__(*args, **kwargs)
+
+        # double calls, but that's what we want
+        if self._unit == "degrees":
+            self.x = radians(self.x)
+            self.y = radians(self.y)
+            self.z = radians(self.z)
 
         for fn in EulerRotation.WRAP_FUNCS:
             setattr(
@@ -354,6 +520,83 @@ class EulerRotation(OpenMaya.MEulerRotation):
                 _warp_dt(super(EulerRotation, self).__getattribute__(fn)),
             )
 
+    # def toList(self):
+    #     return self._convert_from_api([self.x, self.y, self.z])
+
+    @property
+    def unit(self):
+        return self._unit
+
+    @unit.setter
+    def unit(self, val):
+        if not val in ("degrees", "radians"):
+            raise ValueError("Unit must be degrees or radians.")
+        else:
+            # underlying values are the same, no need to do anything
+            self._unit = val
+            # if not unit == self.unit:
+            #     curr = (self.x, self.y, self.z)
+            #     if unit == "degrees":
+
+
+    def _convert_to_api(self, v):
+        if self.unit == "degrees":
+            return radians(v)
+        else:
+            return v
+
+    def _convert_from_api(self, v):
+        if self.unit == "degrees":
+            return degrees(v)
+        else:
+            return v
+
+    def __getitem__(self, item):
+        return self._convert_from_api(self.base.__getitem__(item))
+
+    def __setitem__(self, key, value):
+        self.base.__setitem__(key, self._convert_to_api(value))
+
+    def __repr__(self):
+        return "EulerRotation({})".format([self.x, self.y, self.z])
+
+    def __mul__(self, other):
+        return EulerRotation(self.base.__mul__(other))
+
+    def __imul__(self, other):
+        return EulerRotation(self.base.__imul__(other))
+
+    def __rmul__(self, other):
+        return EulerRotation(self.base.__rmul__(other))
+
+    @property
+    def x(self):
+        return self[0]
+
+    @x.setter
+    def x(self, val):
+        self[0] = val
+
+    @property
+    def y(self):
+        return self[1]
+
+    @y.setter
+    def y(self, val):
+        self[1] = val
+
+    @property
+    def z(self):
+        return self[2]
+
+    @z.setter
+    def z(self, val):
+        self[2] = val
+
+
+# they already use the class?
+# degrees = _warp_dt(util.degrees)
+# radians = _warp_dt(util.radians)
 
 __all__ = [
     "Vector",
@@ -362,6 +605,7 @@ __all__ = [
     "TransformationMatrix",
     "Quaternion",
     "degrees",
+    "radians",
     "Point",
     "BoundingBox",
     "Space",
